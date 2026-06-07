@@ -3,7 +3,9 @@
 venv/
 .venv/
 env/
-env_Reto4
+env_Reto4/
+env_reto04/
+
 
 # Caché y archivos compilados
 __pycache__/
