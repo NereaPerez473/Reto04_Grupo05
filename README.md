@@ -5,7 +5,7 @@ Este proyecto desarrolla un sistema multiagente (MAS) para gestionar una microre
 
 ## Autoras (Grupo 05)
 * Alai Urra
-* Libe Velasco
+* Libe Belasko
 * Nerea Perez
 * Paola Alvarez
 
