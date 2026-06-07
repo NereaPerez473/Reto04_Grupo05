@@ -1,0 +1,10 @@
+# Entornos Virtuales
+
+venv/
+.venv/
+env/
+env_Reto4
+
+# Caché y archivos compilados
+__pycache__/
+*.pyc
