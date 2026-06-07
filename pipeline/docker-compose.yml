@@ -1,0 +1,29 @@
+services:
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    container_name: prefect_server_sqlite
+    restart: always
+    # Forzamos el comando de inicio para asegurar que arranque
+    entrypoint: ["prefect", "server", "start", "--host", "0.0.0.0"]
+    environment:
+      - PREFECT_API_URL=http://127.0.0.1:4200/api
+      - PREFECT_API_DATABASE_CONNECTION_URL=sqlite+aiosqlite:////root/.prefect/prefect.db
+    ports:
+      - "4200:4200"
+    volumes:
+      - prefect_data:/root/.prefect
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+
+volumes:
+  prefect_data:
+  qdrant_data:
