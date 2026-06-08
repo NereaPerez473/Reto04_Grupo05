@@ -35,25 +35,29 @@ import pandas as pd
 from solar_agent import SolarAgent
 from wind_agent import WindAgent
 from consumer_agent import ConsumerAgent
+from pathlib import Path
+
+# .parent.parent es la carpeta raíz 'Reto04_Grupo05'
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Rutas por defecto
-SOLAR_CSV = "data/results/Predicciones_Solar.csv"
-WIND_CSV  = "data/results/Predicciones_Eolico.csv"
-LOAD_CSV  = ("data/raw/"
-             "RefBldgFullServiceRestaurantNew2004_v1.3_7.1_6A_USA_MN_MINNEAPOLIS.csv")
-PRICE_CSV = "data/raw/precio2025-peninsula.csv"
-OUTPUT_DIR = "data/results"
+SOLAR_CSV = BASE_DIR/"data"/"results"/"Predicciones_Solar.csv"
+WIND_CSV  = BASE_DIR /"data"/"results"/"Predicciones_Eolico.csv"
+LOAD_CSV  = BASE_DIR/"data"/"raw"/"RefBldgFullServiceRestaurantNew2004_v1.3_7.1_6A_USA_MN_MINNEAPOLIS.csv"
+PRICE_CSV = BASE_DIR/"data"/"raw"/"precio2025-peninsula.csv"
+OUTPUT_DIR = BASE_DIR/"mas_nerea"/"results"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def run_simulation(
     strategy_as: str = "honest",
     strategy_ae: str = "honest",
     n_steps: int = 500,
-    solar_csv: str = SOLAR_CSV,
-    wind_csv: str  = WIND_CSV,
-    load_csv: str  = LOAD_CSV,
-    price_csv: str = PRICE_CSV,
-    output_dir: str = OUTPUT_DIR,
+    solar_csv: str = str(SOLAR_CSV),
+    wind_csv: str  = str(WIND_CSV),
+    load_csv: str  = str(LOAD_CSV),
+    price_csv: str = str(PRICE_CSV),
+    output_dir: str = str(OUTPUT_DIR),
     save_csv: bool = True,
 ) -> pd.DataFrame:
     """
