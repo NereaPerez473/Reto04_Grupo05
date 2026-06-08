@@ -3,7 +3,7 @@ generar_precios_agentes.py
 ==========================================================================
 Reto 04 - Microred multiagente (MU - Master IA Aplicada)
 
-Genera el precio de la energia (EUR/kWh) que cobraria cada agente generador
+Genera el precio de la energia (EUR/MWh) que cobraria cada agente generador
 de la microred (Agente Solar y Agente Eolico) a partir de:
 
   1) precio2025-peninsula.csv  -> precio real PVPC 2.0TD Peninsula (ancla)
@@ -22,7 +22,7 @@ si una fuente genera mucho respecto a lo habitual, su energia es abundante
   * Eolico -> mucha generacion en invierno => barato en invierno / caro en verano
 
 Usamos el precio PVPC real como ANCLA para que el nivel resultante sea
-realista (EUR/kWh creibles) y conserve la estructura temporal del mercado.
+realista (EUR/MWh creibles) y conserve la estructura temporal del mercado.
 
 PASOS DEL ESCALADO
 ------------------
@@ -41,14 +41,16 @@ Para cada fuente con generacion g(t):
       base; sin sol, el 130%".
 
   (4) Precio final de la fuente:
-          precio_fuente = precio_base_kWh * multiplicador
+          precio_fuente = precio_base * multiplicador
 
 UNIDADES
 --------
-- Precio del CSV: YA viene en EUR/kWh -> se usa tal cual (sin conversion).
-- Generacion: viene en MWh -> *1000 -> kWh (como pide el enunciado). El
-  multiplicador es adimensional, asi que la unidad de la generacion no
-  cambia el resultado; convertimos para que la salida sea autoexplicativa.
+Todo se mantiene en MWh, sin conversiones:
+- Precio del CSV: viene en EUR/MWh -> se usa tal cual.
+- Generacion: viene en MWh -> se usa tal cual.
+- Salida: precio de cada fuente en EUR/MWh.
+El multiplicador es adimensional, por lo que la unidad de la generacion no
+afecta al resultado.
 """
 
 from __future__ import annotations
@@ -78,7 +80,6 @@ F_SOLAR = "export_GeneracionTRealSolarFotovoltaica_2026-06-08_10_11.csv"
 F_EOLICO = "export_GeneracionMedidaEolicaTerrestre_2026-06-08_10_13.csv"
 
 SEP = ";"
-MWH_TO_KWH = 1000.0
 
 
 # --------------------------------------------------------------------------
@@ -112,24 +113,24 @@ def multiplicador(generacion: pd.Series, m_min: float, m_max: float,
 
 def construir_precio_fuente(base: pd.DataFrame, gen_col: str,
                             m_min: float, m_max: float) -> pd.DataFrame:
-    """DataFrame final de precios para una fuente."""
+    """DataFrame final de precios para una fuente (todo en MWh)."""
     mult = multiplicador(base[gen_col], m_min, m_max)
     return pd.DataFrame({
         "datetime": base["datetime"],
-        "generacion_kwh": (base[gen_col] * MWH_TO_KWH).round(3),
-        "precio_base_eur_kwh": base["precio_eur_kwh"].round(6),
+        "generacion_mwh": base[gen_col].round(3),
+        "precio_base_eur_mwh": base["precio_eur_mwh"].round(3),
         "multiplicador": mult.round(4),
-        "precio_eur_kwh": (base["precio_eur_kwh"] * mult).round(6),  # (4)
+        "precio_eur_mwh": (base["precio_eur_mwh"] * mult).round(3),  # (4)
     })
 
 
 def resumen(df: pd.DataFrame, etiqueta: str) -> None:
     """Estadisticas de validacion del precio generado."""
-    p = df["precio_eur_kwh"]
+    p = df["precio_eur_mwh"]
     print(f"\n--- {etiqueta} ---")
-    print(f"  precio medio : {p.mean():.4f} EUR/kWh "
-          f"(base: {df['precio_base_eur_kwh'].mean():.4f})")
-    print(f"  min / max    : {p.min():.4f} / {p.max():.4f} EUR/kWh")
+    print(f"  precio medio : {p.mean():.2f} EUR/MWh "
+          f"(base: {df['precio_base_eur_mwh'].mean():.2f})")
+    print(f"  min / max    : {p.min():.2f} / {p.max():.2f} EUR/MWh")
     print(f"  multiplicador min / max: "
           f"{df['multiplicador'].min():.2f} / {df['multiplicador'].max():.2f}")
 
@@ -140,7 +141,7 @@ def main(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> None:
     out.mkdir(parents=True, exist_ok=True)
 
     # (0) Cargar las tres series y unirlas por la marca temporal UTC
-    precio = cargar_serie(raw / F_PRECIO, "precio_eur_kwh")
+    precio = cargar_serie(raw / F_PRECIO, "precio_eur_mwh")
     solar = cargar_serie(raw / F_SOLAR, "gen_solar_mwh")[["dt_utc", "gen_solar_mwh"]]
     eolico = cargar_serie(raw / F_EOLICO, "gen_eolico_mwh")[["dt_utc", "gen_eolico_mwh"]]
 
@@ -149,15 +150,16 @@ def main(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> None:
             .merge(eolico, on="dt_utc", how="inner")
             .sort_values("dt_utc")
             .reset_index(drop=True))
-    # El precio del CSV ya esta en EUR/kWh -> se usa directamente (sin /1000)
+
+    # Sin conversion de unidades: precio en EUR/MWh y generacion en MWh.
 
     print(f"Filas alineadas (precio + solar + eolico): {len(base)}")
 
     df_solar = construir_precio_fuente(base, "gen_solar_mwh", SOLAR_MIN, SOLAR_MAX)
     df_eolico = construir_precio_fuente(base, "gen_eolico_mwh", EOLICO_MIN, EOLICO_MAX)
 
-    f_solar = out / "precio_solar_kwh.csv"
-    f_eolico = out / "precio_eolico_kwh.csv"
+    f_solar = out / "precio_solar_mwh.csv"
+    f_eolico = out / "precio_eolico_mwh.csv"
     df_solar.to_csv(f_solar, sep=SEP, index=False)
     df_eolico.to_csv(f_eolico, sep=SEP, index=False)
 
@@ -167,7 +169,7 @@ def main(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> None:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Genera precios EUR/kWh solar y eolico.")
+    ap = argparse.ArgumentParser(description="Genera precios EUR/MWh solar y eolico.")
     ap.add_argument("--raw", default=RAW_DIR, help="carpeta de los 3 CSV de entrada")
     ap.add_argument("--out", default=OUT_DIR, help="carpeta de salida")
     a = ap.parse_args()

@@ -1,0 +1,8 @@
+strategy_as,strategy_ae,total_cost_eur,mean_cost_per_step_eur,mean_renewable_coverage,total_grid_purchased_kwh,total_solar_shortfall_kwh,total_wind_shortfall_kwh,total_shortfall_kwh,n_steps
+honest,honest,2598.7244,5.197449,86.91,2524.83,0.0,0.0,0.0,500
+deception,honest,2564.8997,5.129799,85.7,2757.33,332.6461,0.0,332.6461,500
+honest,deception,2501.8077,5.003615,84.65,2963.19,0.0,1220.8343,1220.8343,500
+hide_information,honest,2649.7741,5.299548,76.82,4484.83,0.0,0.0,0.0,500
+honest,hide_information,2854.4166,5.708833,25.19,12253.4,0.0,0.0,0.0,500
+deception,deception,2481.6846,4.963369,85.7,2757.33,332.6461,755.2799,1087.926,500
+hide_information,hide_information,2974.0273,5.948055,0.0,17038.87,0.0,0.0,0.0,500
