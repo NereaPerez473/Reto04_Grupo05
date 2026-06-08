@@ -96,6 +96,12 @@ def run_simulation(
     # Ejecutar simulación (bloquea hasta que termina)
     df_results = consumer.run()
 
+    # Cerrar servidores para liberar puertos antes de la siguiente simulación
+    solar.stop()
+    wind.stop()
+    t_solar.join(timeout=2.0)
+    t_wind.join(timeout=2.0)
+
     # Añadir columnas de metadatos para facilitar la comparación
     df_results["strategy_as"] = strategy_as
     df_results["strategy_ae"] = strategy_ae
