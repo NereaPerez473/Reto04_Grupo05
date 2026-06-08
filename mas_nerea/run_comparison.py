@@ -28,6 +28,14 @@ Uso
 import argparse
 import pandas as pd
 from run_mas import run_simulation
+from pathlib import Path
+
+# .parent.parent es la carpeta raíz 'Reto04_Grupo05'
+BASE_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = BASE_DIR /"mas_nerea"/"results"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+CSV_DIR_ALL=OUTPUT_DIR / "mas_comparison_all.csv"
+CSV_DIR_SUMMARY=OUTPUT_DIR / "mas_summary.csv"
 
 COMBINATIONS = [
     ("honest",           "honest"),
@@ -74,18 +82,18 @@ def run_comparison(n_steps: int = 500) -> pd.DataFrame:
 
     # DataFrame consolidado
     df_all = pd.concat(all_results, ignore_index=True)
-    df_all.to_csv("data/results/mas_comparison_all.csv", index=False)
+    df_all.to_csv(str(CSV_DIR_ALL), index=False)
 
     df_summary = pd.DataFrame(summary_rows)
-    df_summary.to_csv("data/results/mas_summary.csv", index=False)
+    df_summary.to_csv(str(CSV_DIR_SUMMARY), index=False)
 
     print("\n" + "="*60)
     print("RESUMEN COMPARACIÓN DE ESTRATEGIAS")
     print("="*60)
     print(df_summary.to_string(index=False))
     print(f"\nArchivos guardados:")
-    print(f"  data/results/mas_comparison_all.csv")
-    print(f"  data/results/mas_summary.csv")
+    print(f"  mas_nerea/results/mas_comparison_all.csv")
+    print(f"  mas_nerea/results/mas_summary.csv")
 
     return df_all
 
