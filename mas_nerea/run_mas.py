@@ -44,7 +44,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SOLAR_CSV = BASE_DIR/"data"/"results"/"Predicciones_Solar.csv"
 WIND_CSV  = BASE_DIR /"data"/"results"/"Predicciones_Eolico.csv"
 LOAD_CSV  = BASE_DIR/"data"/"raw"/"RefBldgFullServiceRestaurantNew2004_v1.3_7.1_6A_USA_MN_MINNEAPOLIS.csv"
-PRICE_CSV = BASE_DIR/"data"/"raw"/"precio2025-peninsula.csv"
+PRICE_CSV = BASE_DIR/"data"/"raw"/"Precios"/"precio2025-peninsula.csv"
 OUTPUT_DIR = BASE_DIR/"mas_nerea"/"results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
