@@ -25,9 +25,12 @@ Uso
 
 import argparse
 from base_agent import ProducerAgent
+from pathlib import Path
 
 PORT_SOLAR = 5001
-DEFAULT_CSV = "data/results/Predicciones_Solar.csv"
+# .parent.parent es la carpeta raíz 'Reto04_Grupo05'
+BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_CSV = BASE_DIR/"data"/"results"/"Predicciones_Solar.csv"
 
 
 class SolarAgent(ProducerAgent):
@@ -42,7 +45,7 @@ class SolarAgent(ProducerAgent):
     hide_factor   : float  Solo para strategy="hide_information". Default 0.70.
     """
 
-    def __init__(self, csv_path: str = DEFAULT_CSV,
+    def __init__(self, csv_path: str = str(DEFAULT_CSV),
                  strategy_name: str = "honest",
                  bluff_factor: float = 1.3,
                  hide_factor: float = 0.70):
