@@ -1,0 +1,218 @@
+1. Sistema Multiagente (MAS)-carpeta mas_paola
+
+Implementamos una microred con tres agentes:
+
+Agente Solar (AS)
+Agente Eólico (AE)
+Agente Consumidor (AC)
+
+Los agentes se comunican mediante mensajes tipo FIPA-ACL:
+
+CFP
+ ↓
+PROPOSE
+ ↓
+ACCEPT / REJECT
+ ↓
+INFORM
+
+donde cada productor negocia cuánta energía puede suministrar.
+
+2. Aprendizaje por Refuerzo (Q-Learning)-carpeta mas_qlearning
+
+Entrenamos políticas de negociación para que los productores aprendieran qué estrategia utilizar:
+
+honest
+hide_information
+deception
+
+utilizando estados discretizados basados en:
+
+Demanda
+Precio electricidad
+Producción propia
+
+El resultado del entrenamiento fueron las Q-Tables:
+
+negotiation_solar_qtable.npy
+negotiation_wind_qtable.npy
+Integración final
+
+La solución final combina ambas partes:
+
+                ENTRENAMIENTO
+
+        Datos históricos de la microred
+                     │
+                     ▼
+            Entorno de negociación
+                     │
+                     ▼
+                Q-Learning
+                     │
+                     ▼
+              Q-Tables aprendidas
+                     │
+                     ▼
+
+=================================================
+
+                EJECUCIÓN MAS
+
+            ┌─────────────────┐
+            │ Agente Solar    │
+            └────────┬────────┘
+                     │
+                     │ consulta
+                     ▼
+                Q-Table Solar
+                     │
+                     ▼
+          honest / hide / deception
+
+            ┌─────────────────┐
+            │ Agente Eólico   │
+            └────────┬────────┘
+                     │
+                     │ consulta
+                     ▼
+                Q-Table Wind
+                     │
+                     ▼
+          honest / hide / deception
+
+                     │
+                     ▼
+
+            ┌─────────────────┐
+            │ Agente Consumidor│
+            └────────┬────────┘
+                     │
+                     ▼
+              Asignación energía
+                     │
+                     ▼
+           Cobertura + Costes + Grid
+
+Nivel de negociación
+
+Los productores ya no siguen una estrategia fija.
+
+Antes:
+
+Solar = honest siempre
+Wind = deception siempre
+
+Ahora:
+
+Estado actual
+      ↓
+Q-Table
+      ↓
+Mejor acción
+      ↓
+Estrategia seleccionada
+
+Por tanto los agentes toman decisiones adaptativas.
+
+Nivel de microred
+
+Hemos medido:
+
+Cobertura renovable
+Energía suministrada
+Compra a red
+Coste total
+Shortfalls
+
+y generado gráficas de comportamiento.
+
+Los resultados muestran:
+
+Cobertura renovable elevada (frecuentemente >80%)
+Shortfalls puntuales pero no sistemáticos
+Coste estable
+Uso razonable de la red como respaldo
+Limitaciones actuales
+
+Actualmente la política aprendida utiliza:
+
+Demanda
+Precio
+Producción propia
+
+pero no conoce:
+
+Producción exacta del competidor
+Estado interno del competidor
+Futuras decisiones del competidor
+
+Esto es coherente con un mercado real donde la información es parcial.
+
+Siguientes pasos
+Paso 1 — Añadir estrategias al CSV
+
+Guardar también:
+
+solar_strategy
+wind_strategy
+
+para analizar:
+
+% Honest
+% Hide Information
+% Deception
+
+Esto permitirá justificar qué comportamiento ha aprendido cada agente.
+
+Paso 2 — Reward más realista
+
+Actualmente el reward depende principalmente de:
+
+Ingresos
+Shortfall
+
+Podemos añadir:
+
+Coste de generación solar
+Coste de generación eólica
+Penalización por compra a red
+Penalización por incumplimiento
+
+para aproximar mejor un mercado energético real.
+
+Paso 3 — Aprendizaje online dentro del MAS
+
+Ahora:
+
+Entrenamiento
+    ↓
+Q-Table fija
+    ↓
+MAS
+
+La evolución natural sería:
+
+MAS
+ ↓
+Negociación
+ ↓
+Reward real
+ ↓
+Actualización Q
+ ↓
+Nueva política
+
+es decir, que los agentes sigan aprendiendo mientras negocian.
+
+Paso 4 — Incorporar batería directamente del entorno discreto que teníamos
+
+Una batería introduciría nuevas acciones:
+
+Vender energía
+Guardar energía
+Descargar batería
+Comprar a red
+
+transformando el problema en una gestión energética completa de la microred.
+
