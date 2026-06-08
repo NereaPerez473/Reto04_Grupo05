@@ -106,6 +106,16 @@ class ConsumerAgent:
         except (json.JSONDecodeError, OSError):
             return None
 
+    @staticmethod
+    def _recv_line(file) -> dict | None:
+        try:
+            data = file.readline()
+            if not data:
+                return None
+            return parse_message(data.decode('utf-8').strip())
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            return None
+
     # ------------------------------------------------------------------ #
     # Lógica de decisión (cheapest-first, precio <= mercado)
     # ------------------------------------------------------------------ #
@@ -176,6 +186,8 @@ class ConsumerAgent:
 
         sock_solar = self._connect(PORT_SOLAR)
         sock_wind  = self._connect(PORT_WIND)
+        file_solar = sock_solar.makefile('rb')
+        file_wind  = sock_wind.makefile('rb')
         print("[AgenteConsumidor] Conexiones establecidas. Iniciando negociación...\n")
 
         try:
@@ -192,8 +204,8 @@ class ConsumerAgent:
                 self._send(sock_solar, "cfp", cfp_content)
                 self._send(sock_wind,  "cfp", cfp_content)
 
-                msg_solar = self._recv(sock_solar)
-                msg_wind  = self._recv(sock_wind)
+                msg_solar = self._recv_line(file_solar)
+                msg_wind  = self._recv_line(file_wind)
 
                 solar_prop = msg_solar["content"] if msg_solar else None
                 wind_prop  = msg_wind["content"]  if msg_wind  else None
@@ -224,7 +236,7 @@ class ConsumerAgent:
                         "price_eur_kwh":   round(allocation["solar"]["price"], 6),
                         "timestep":        t,
                     })
-                    inform = self._recv(sock_solar)
+                    inform = self._recv_line(file_solar)
                     if inform and inform["performative"] == "inform":
                         solar_delivered = float(inform["content"]["actual_delivered_kw"])
                     solar_cost = solar_delivered * allocation["solar"]["price"]
@@ -238,7 +250,7 @@ class ConsumerAgent:
                         "price_eur_kwh":   round(allocation["wind"]["price"], 6),
                         "timestep":        t,
                     })
-                    inform = self._recv(sock_wind)
+                    inform = self._recv_line(file_wind)
                     if inform and inform["performative"] == "inform":
                         wind_delivered = float(inform["content"]["actual_delivered_kw"])
                     wind_cost = wind_delivered * allocation["wind"]["price"]
@@ -290,6 +302,8 @@ class ConsumerAgent:
                           f"Coste acum.: {sum(r['total_cost_eur'] for r in self.history):.2f} EUR")
 
         finally:
+            file_solar.close()
+            file_wind.close()
             sock_solar.close()
             sock_wind.close()
 

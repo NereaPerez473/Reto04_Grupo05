@@ -66,6 +66,7 @@ class ProducerAgent:
         self.total_revenue_eur: float = 0.0
         self.history: list[dict] = []
         self._current_proposal: EnergyProposal | None = None
+        self._server: socket.socket | None = None
 
         print(f"[{self.name}] Listo | {len(self.power_series)} timesteps | "
               f"Estrategia: {strategy_name}")
@@ -184,31 +185,34 @@ class ProducerAgent:
     def _handle_connection(self, conn: socket.socket, addr) -> None:
         """Bucle de mensajería para una conexión activa."""
         print(f"[{self.name}] Conexión aceptada desde {addr}")
-        while True:
-            try:
-                data = conn.recv(4096).decode()
-                if not data:
+        file = conn.makefile('rb')
+        try:
+            while True:
+                try:
+                    data = file.readline()
+                    if not data:
+                        break
+                    msg = parse_message(data.decode('utf-8').strip())
+                    perf = msg["performative"]
+
+                    if perf == "cfp":
+                        self._on_cfp(msg, conn)
+                    elif perf == "accept-proposal":
+                        self._on_accept(msg, conn)
+                    elif perf == "reject-proposal":
+                        self._on_reject(msg)
+                    else:
+                        print(f"[{self.name}] Performativa no reconocida: {perf}")
+
+                except (ConnectionResetError, ConnectionAbortedError,
+                        json.JSONDecodeError, BrokenPipeError, OSError):
                     break
-                msg = parse_message(data)
-                perf = msg["performative"]
-
-                if perf == "cfp":
-                    self._on_cfp(msg, conn)
-                elif perf == "accept-proposal":
-                    self._on_accept(msg, conn)
-                elif perf == "reject-proposal":
-                    self._on_reject(msg)
-                else:
-                    print(f"[{self.name}] Performativa no reconocida: {perf}")
-
-            except (ConnectionResetError, ConnectionAbortedError,
-                    json.JSONDecodeError, BrokenPipeError):
-                break
-
-        conn.close()
-        print(f"[{self.name}] Conexión cerrada | "
-              f"Ingresos totales: {self.total_revenue_eur:.4f} EUR | "
-              f"Steps procesados: {self.current_step}")
+        finally:
+            file.close()
+            conn.close()
+            print(f"[{self.name}] Conexión cerrada | "
+                  f"Ingresos totales: {self.total_revenue_eur:.4f} EUR | "
+                  f"Steps procesados: {self.current_step}")
 
     # ------------------------------------------------------------------ #
     # Arranque del servidor
@@ -220,13 +224,26 @@ class ProducerAgent:
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server.bind((HOST, self.port))
             server.listen(1)
+            self._server = server
             print(f"[{self.name}] Servidor activo en {HOST}:{self.port}")
-            while True:
-                conn, addr = server.accept()
-                t = threading.Thread(
-                    target=self._handle_connection, args=(conn, addr), daemon=True
-                )
-                t.start()
+            try:
+                while True:
+                    conn, addr = server.accept()
+                    t = threading.Thread(
+                        target=self._handle_connection, args=(conn, addr), daemon=True
+                    )
+                    t.start()
+            except OSError:
+                pass  # server socket closed via stop()
+
+    def stop(self) -> None:
+        """Cierra el servidor TCP para liberar el puerto."""
+        if self._server is not None:
+            try:
+                self._server.close()
+            except OSError:
+                pass
+            self._server = None
 
     # ------------------------------------------------------------------ #
     # Acceso al histórico

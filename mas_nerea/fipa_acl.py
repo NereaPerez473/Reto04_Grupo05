@@ -38,7 +38,7 @@ def create_message(performative: str, sender: str, receiver: str,
         "sender": sender,
         "receiver": receiver,
         "content": content
-    })
+    }) + "\n"
 
 
 def parse_message(message_str: str) -> dict:
