@@ -38,7 +38,7 @@ negotiation_solar_qtable.npy
 negotiation_wind_qtable.npy
 Integración final
 
-La solución final combina ambas partes:
+La solución final combina ambas partes: carpeta mas_qlearning_agents
 
                 ENTRENAMIENTO
 
