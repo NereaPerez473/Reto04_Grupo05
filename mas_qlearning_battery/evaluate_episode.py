@@ -31,8 +31,8 @@ QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_bat
 QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_wind_qtable.npy"
 
 #RUTA DE GUARDADO
-SAVE_PATH_IMG=BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot.png"
-SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode.csv"
+SAVE_PATH_IMG=BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_comp.png"
+SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_comp.csv"
 
 
 # ==================================================
@@ -139,7 +139,7 @@ ax2.set_ylabel("Estado de Carga (%)", color="green")
 ax2.set_ylim(0, 105)
 ax2.legend(loc="upper right")
 
-plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana)")
+plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana)- Competitivo")
 plt.tight_layout()
 plt.savefig(str(SAVE_PATH_IMG), dpi=300, bbox_inches="tight")
 
