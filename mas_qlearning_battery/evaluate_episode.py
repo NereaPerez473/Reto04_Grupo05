@@ -40,7 +40,7 @@ SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episod
 # ==================================================
 solar = pd.read_csv(SOLAR_CSV)["SystemProduction_AS"].astype(float).values
 wind  = pd.read_csv(WIND_CSV)["Power_AE"].astype(float).values
-load  = pd.read_csv(LOAD_CSV)["Electricity:Facility [kW](Hourly)"].astype(float).values
+load  = (pd.read_csv(LOAD_CSV)["Electricity:Facility [kW](Hourly)"].astype(float)*2.5).values
 price = pd.read_csv(PRICE_CSV, sep=";")["value"].astype(float).values / 1000.0
 
 n_steps = min(len(solar), len(wind), len(load), len(price))
