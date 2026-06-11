@@ -51,7 +51,7 @@ price_df = pd.read_csv(PRICE_CSV, sep=";")
 
 solar = solar_df["SystemProduction_AS"].astype(float).values
 wind  = wind_df["Power_AE"].astype(float).values
-load  = load_df["Electricity:Facility [kW](Hourly)"].astype(float).values
+load  = (load_df["Electricity:Facility [kW](Hourly)"].astype(float)*2.5).values
 price = price_df["value"].astype(float).values / 1000.0
 
 n_steps = min(len(solar), len(wind), len(load), len(price))
