@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 
 from strategy_qlearning import StrategyQLearning
+from strategies import NegotiationStrategies
 
 
 # ==================================================
