@@ -5,7 +5,11 @@ Orden de ejecucion:
   1. ETL          (pipeline/etl.py)
   2. Inferencia   (pipeline/inference.py)
   3. Precios      (optimizacion/generar_precios_agentes.py)
-  4. Optimizacion (optimizacion/Optimizacion.ipynb via papermill)
+  4. Optimizacion — cuatro tasks en lugar del notebook completo:
+       4a. tarea_setup_datos      -> carga datos y calcula cotas
+       4b. tarea_run_nsgaii       -> ejecuta NSGA-II con best_params del DB
+       4c. tarea_run_spea2        -> ejecuta SPEA2 con best_params del DB
+       4d. tarea_analizar_resultados -> metricas, plots y guardado
 """
 
 from __future__ import annotations
@@ -45,34 +49,6 @@ def tarea_generar_precios(raw_dir: str, out_dir: str) -> str:
 
     generar_precios_agentes.main(raw_dir=raw_dir, out_dir=out_dir)
     return out_dir
-
-
-# ---------------------------------------------------------------------------
-# Tarea 4 – Ejecucion del notebook de optimizacion
-# ---------------------------------------------------------------------------
-@task(name="Optimizacion Notebook", log_prints=True, retries=0)
-def tarea_optimizacion(notebook_path: str, output_path: str) -> str:
-    """
-    Ejecuta Optimizacion.ipynb con papermill.
-
-    - cwd se fija en el directorio del notebook para que los paths relativos
-      del propio notebook (../data/...) resuelvan correctamente.
-    - timeout de 3 horas para las tiradas largas de NSGA-II / SPEA2.
-    - El notebook escribe en optuna_microred.db (persistido en bind mount).
-    """
-    import papermill as pm  # noqa: PLC0415
-
-    nb_dir = str(Path(notebook_path).parent)
-    print(f"Ejecutando notebook: {notebook_path}")
-    pm.execute_notebook(
-        input_path=notebook_path,
-        output_path=output_path,
-        cwd=nb_dir,
-        kernel_name="python3",
-        execution_timeout=10_800,  # 3 h
-    )
-    print(f"Notebook completado. Salida: {output_path}")
-    return output_path
 
 
 # ---------------------------------------------------------------------------
@@ -130,10 +106,35 @@ def pipeline_microred() -> None:
         out_dir=str(proc_dir / "Precios"),
     )
 
-    # 4 – Optimizacion multiobjetivo (escribe en optuna_microred.db)
-    tarea_optimizacion(
-        notebook_path=str(opt_dir / "Optimizacion.ipynb"),
-        output_path=str(opt_dir / "Optimizacion_output.ipynb"),
+    # 4 – Optimizacion multiobjetivo en cuatro tasks
+    from optimizacion.optimizacion_tasks import (  # noqa: PLC0415
+        tarea_setup_datos,
+        tarea_run_nsgaii,
+        tarea_run_spea2,
+        tarea_analizar_resultados,
+    )
+
+    opt_results_dir = str(res_dir / "optimizacion")
+    optuna_db       = str(opt_dir / "optuna_microred.db")
+
+    # 4a – Carga de datos y calculo de cotas (depende de precios e inferencia)
+    datos_ctx = tarea_setup_datos(
+        data_dir_raw=str(raw_dir),
+        data_dir_processed=str(proc_dir),
+        data_dir_results=str(res_dir),
+        output_dir=opt_results_dir,
+    )
+
+    # 4b y 4c – Ejecucion de cada algoritmo con best_params guardados en el DB
+    res_nsgaii = tarea_run_nsgaii(datos=datos_ctx, optuna_db=optuna_db)
+    res_spea2  = tarea_run_spea2(datos=datos_ctx,  optuna_db=optuna_db)
+
+    # 4d – Metricas, plots comparativos y guardado
+    tarea_analizar_resultados(
+        datos=datos_ctx,
+        res_nsgaii=res_nsgaii,
+        res_spea2=res_spea2,
+        optuna_db=optuna_db,
     )
 
 
