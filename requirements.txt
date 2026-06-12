@@ -9,3 +9,5 @@ optuna>=3.6
 jmetalpy>=1.5.9
 matplotlib>=3.8
 gymnasium>=0.29
+flask>=3.0
+papermill>=2.5

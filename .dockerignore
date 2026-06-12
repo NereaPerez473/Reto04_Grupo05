@@ -1,0 +1,35 @@
+# Modelos grandes: se montan como bind mount, no se copian en la imagen
+models/
+
+# Datos: idem
+data/
+
+# Ficheros grandes de ML
+*.pkl
+*.h5
+*.pt
+*.onnx
+
+# Notebooks de salida generados por papermill
+optimizacion/Optimizacion_output.ipynb
+
+# Entornos virtuales y caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Git
+.git/
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
