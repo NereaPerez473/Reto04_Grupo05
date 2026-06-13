@@ -119,34 +119,25 @@ for episode in range(N_EPISODES):
         wind_power    = wind[t]
 
         # ==========================================
-        # FÍSICA DE BATERÍA (antes de negociación)
+        # 1. FASE 1: DESCARGA FÍSICA
         # ==========================================
-
-        raw_renewable      = solar_power + wind_power
-        battery_contribution = 0.0
-
-        if raw_renewable >= demand:
-            excess = raw_renewable - demand
-            battery.charge(excess)
-            effective_demand = demand
-        else:
-            deficit = demand - raw_renewable
-            battery_contribution = battery.discharge(deficit)
-            effective_demand = max(0.0, demand - battery_contribution)
-
+        # La batería intenta cubrir la demanda bruta primero
+        battery_contribution = battery.discharge(demand)
+        effective_demand = demand - battery_contribution
+        
+        # Guardamos el SoC que verán los agentes en el "CFP" virtual
         episode_soc.append(battery.soc)
 
         # ==========================================
-        # ESTADOS (incluye SoC de la batería)
+        # 2. ESTADOS (Uso de demanda efectiva)
         # ==========================================
-
-        solar_state = solar_agent.get_state(demand, current_price, battery.soc)
-        wind_state  = wind_agent.get_state(demand, current_price, battery.soc)
+        # Los agentes observan la demanda EFECTIVA, no la bruta
+        solar_state = solar_agent.get_state(effective_demand, current_price, battery.soc)
+        wind_state  = wind_agent.get_state(effective_demand, current_price, battery.soc)
 
         # ==========================================
         # ACCIONES Y ESTRATEGIAS
         # ==========================================
-
         solar_action   = solar_agent.choose_action(solar_state)
         wind_action    = wind_agent.choose_action(wind_state)
         solar_strategy = solar_agent.action_to_strategy(solar_action)
@@ -155,7 +146,6 @@ for episode in range(N_EPISODES):
         # ==========================================
         # PRODUCCIÓN DECLARADA
         # ==========================================
-
         if solar_strategy == "honest":
             solar_declared = solar_power
         elif solar_strategy == "hide_information":
@@ -171,78 +161,88 @@ for episode in range(N_EPISODES):
             wind_declared = wind_power * 1.3
 
         # ==========================================
-        # REPARTO PROPORCIONAL (sobre demanda efectiva)
+        # REPARTO CHEAPEST-FIRST (Merit Order)
         # ==========================================
+        # 1. Obtener las propuestas de precio según la estrategia elegida
+        solar_proposal = NegotiationStrategies.apply(solar_strategy, solar_power, current_price)
+        wind_proposal  = NegotiationStrategies.apply(wind_strategy, wind_power, current_price)
 
-        total_declared = solar_declared + wind_declared
+        # 2. Construir la lista de ofertas para la subasta
+        proposals = [
+            ("solar", solar_declared, solar_proposal.price_eur_kwh),
+            ("wind",  wind_declared,  wind_proposal.price_eur_kwh)
+        ]
 
-        if total_declared > 0:
-            solar_share = solar_declared / total_declared
-            wind_share  = wind_declared  / total_declared
-        else:
-            solar_share = wind_share = 0.0
+        # 3. Filtrar fuentes racionales (por debajo de la red) y ordenar por precio ascendente
+        viable_proposals = [p for p in proposals if p[2] < current_price]
+        viable_proposals.sort(key=lambda x: x[2])
 
-        solar_allocated = effective_demand * solar_share
-        wind_allocated  = effective_demand * wind_share
+        solar_allocated = 0.0
+        wind_allocated  = 0.0
+        remaining_demand = effective_demand
+
+        # 4. Despacho secuencial de energía
+        for source, declared_kw, price_kwh in viable_proposals:
+            if remaining_demand <= 0:
+                break
+            purchase = min(remaining_demand, declared_kw)
+            if source == "solar":
+                solar_allocated = purchase
+            else:
+                wind_allocated = purchase
+            remaining_demand = max(0.0, remaining_demand - purchase)
 
         # ==========================================
-        # ENERGÍA ENTREGADA
+        # ENERGÍA ENTREGADA Y GESTIÓN DE EXCEDENTES
         # ==========================================
-
+        # 1. Comercio: Lo que el consumidor realmente compra y absorbe
         solar_delivered = min(solar_allocated, solar_power)
         wind_delivered  = min(wind_allocated,  wind_power)
-
-        # ==========================================
-        # GRID (después de batería y renovables)
-        # ==========================================
-
         renewable_delivered = solar_delivered + wind_delivered
-        grid_purchased = max(0.0, effective_demand - renewable_delivered)
+        
+        # 2. Red: Si lo comprado no alcanza, se tira de la red eléctrica
+        grid_purchased = 0.0
+        if renewable_delivered < effective_demand:
+            grid_purchased = effective_demand - renewable_delivered
+
+        # 3. Física: Todo el sol/viento que NO ha entrado al restaurante, va a la batería
+        total_physical_production = solar_power + wind_power
+        physical_surplus = max(0.0, total_physical_production - renewable_delivered)
+        
+        if physical_surplus > 0:
+            battery.charge(physical_surplus)
+
         episode_grid_kwh += grid_purchased
 
         # ==========================================
-        # INGRESOS Y EXCESO DECLARADO
+        # INGRESOS Y REWARD COMPETITIVO
         # ==========================================
-
-        # 1. Obtener las propuestas según la estrategia elegida
-        solar_proposal = NegotiationStrategies.apply(
-            solar_strategy, solar_power, current_price
-        )
-        wind_proposal = NegotiationStrategies.apply(
-            wind_strategy, wind_power, current_price
-        )
-
-        # 2. Calcular los ingresos usando el precio propio de la propuesta
         solar_revenue = solar_delivered * solar_proposal.price_eur_kwh
         wind_revenue  = wind_delivered  * wind_proposal.price_eur_kwh
 
-        # 3. Calcular el exceso declarado (penalización por mentir)
         solar_declared_excess = max(0.0, solar_declared - solar_power)
         wind_declared_excess  = max(0.0, wind_declared  - wind_power)
 
-        # ==========================================
-        # REWARD COMPETITIVO
-        # ==========================================
+        # NUEVO: Castigo dinámico por vulnerabilidad de la red
+        dynamic_penalty_factor = 3.0 - (2.0 * battery.soc)
 
-        # 4. Monetizar la penalización multiplicando el exceso declarado por el precio actual 
-        # para castigar solo el engaño en euros.
-        solar_reward = solar_revenue - (2.0 * solar_declared_excess * current_price)
-        wind_reward  = wind_revenue  - (2.0 * wind_declared_excess * current_price)
+        # Aplicamos el factor dinámico en lugar del 2.0 fijo
+        solar_reward = solar_revenue - (dynamic_penalty_factor * solar_declared_excess * current_price)
+        wind_reward  = wind_revenue  - (dynamic_penalty_factor * wind_declared_excess * current_price)
 
-    
         solar_total_reward += solar_reward
         wind_total_reward  += wind_reward
 
         # ==========================================
-        # NEXT STATES
+        # NEXT STATES Y ACTUALIZACIONES
         # ==========================================
+        # Corrección MDP: Pre-calcular la demanda efectiva esperada en t+1
+        next_d = load[t+1]
+        next_batt_contrib = min(next_d, battery.available_discharge_kw())
+        next_eff_d = next_d - next_batt_contrib
 
-        next_solar_state = solar_agent.get_state(load[t+1], price[t+1], battery.soc)
-        next_wind_state  = wind_agent.get_state(load[t+1],  price[t+1], battery.soc)
-
-        # ==========================================
-        # ACTUALIZACIONES
-        # ==========================================
+        next_solar_state = solar_agent.get_state(next_eff_d, price[t+1], battery.soc)
+        next_wind_state  = wind_agent.get_state(next_eff_d, price[t+1], battery.soc)
 
         solar_agent.update(solar_state, solar_action, solar_reward, next_solar_state)
         wind_agent.update(wind_state,   wind_action,  wind_reward,  next_wind_state)

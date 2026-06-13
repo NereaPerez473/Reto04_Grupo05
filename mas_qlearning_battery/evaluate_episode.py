@@ -12,9 +12,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+
 from simple_battery import SimpleBattery
-# (Importa aquí tu agente, por ejemplo el competitivo)
 from strategy_qlearning_battery import StrategyQLearning 
+from strategies import NegotiationStrategies # NUEVO: Necesario para la subasta
 
 # ==================================================
 # RUTAS Y DATOS (Ajusta según tu estructura)
@@ -31,9 +32,8 @@ QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_bat
 QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_wind_qtable.npy"
 
 #RUTA DE GUARDADO
-SAVE_PATH_IMG=BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_comp.png"
+SAVE_PATH_IMG= BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_comp.png"
 SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_comp.csv"
-
 
 # ==================================================
 # CARGA DE DATOS HORARIOS
@@ -80,35 +80,93 @@ for t in range(n_steps - 1):
     s = solar[t]
     w = wind[t]
     
-    # 1. Batería Física
-    raw_ren = s + w
-    battery_contribution = 0.0
-    if raw_ren >= d:
-        battery.charge(raw_ren - d)
-        eff_d = d
+    # ==========================================
+    # 1. FASE 1: DESCARGA FÍSICA
+    # ==========================================
+    battery_contribution = battery.discharge(d)
+    eff_d = d - battery_contribution
+    
+    # ==========================================
+    # 2. ESTADOS Y ACCIONES (Automático 3D/4D)
+    # ==========================================
+    if solar_agent.q_table.ndim == 5:
+        # Modelo Negociación
+        s_state = solar_agent.get_state(eff_d, p, s, battery.soc)
+        w_state = wind_agent.get_state(eff_d, p, w, battery.soc)
     else:
-        battery_contribution = battery.discharge(d - raw_ren)
-        eff_d = max(0.0, d - battery_contribution)
-        
-    # 2. Acciones Aprendidas
-    s_state = solar_agent.get_state(d, p, battery.soc)
-    w_state = wind_agent.get_state(d, p, battery.soc)
+        # Modelo Competitivo / Cooperativo
+        s_state = solar_agent.get_state(eff_d, p, battery.soc)
+        w_state = wind_agent.get_state(eff_d, p, battery.soc)
     
     s_action = solar_agent.choose_action(s_state)
     w_action = wind_agent.choose_action(w_state)
     
-    # 3. Registrar variables
+    solar_strategy = solar_agent.action_to_strategy(s_action)
+    wind_strategy  = wind_agent.action_to_strategy(w_action)
+
+    # ==========================================
+    # 3. PRODUCCIÓN DECLARADA
+    # ==========================================
+    solar_declared = s if solar_strategy == "honest" else (s * 0.7 if solar_strategy == "hide_information" else s * 1.3)
+    wind_declared  = w if wind_strategy == "honest" else (w * 0.7 if wind_strategy == "hide_information" else w * 1.3)
+
+    # ==========================================
+    # 4. REPARTO CHEAPEST-FIRST (Merit Order)
+    # ==========================================
+    solar_proposal = NegotiationStrategies.apply(solar_strategy, s, p)
+    wind_proposal  = NegotiationStrategies.apply(wind_strategy, w, p)
+
+    proposals = [
+        ("solar", solar_declared, solar_proposal.price_eur_kwh),
+        ("wind",  wind_declared,  wind_proposal.price_eur_kwh)
+    ]
+
+    viable_proposals = [prop for prop in proposals if prop[2] < p]
+    viable_proposals.sort(key=lambda x: x[2])
+
+    solar_allocated = 0.0
+    wind_allocated  = 0.0
+    remaining_demand = eff_d
+
+    for source, declared_kw, price_kwh in viable_proposals:
+        if remaining_demand <= 0:
+            break
+        purchase = min(remaining_demand, declared_kw)
+        if source == "solar":
+            solar_allocated = purchase
+        else:
+            wind_allocated = purchase
+        remaining_demand = max(0.0, remaining_demand - purchase)
+
+    # ==========================================
+    # 5. LIQUIDACIÓN Y BATERÍA
+    # ==========================================
+    solar_delivered = min(solar_allocated, s)
+    wind_delivered  = min(wind_allocated, w)
+    renewable_delivered = solar_delivered + wind_delivered
+
+    grid_purchased = 0.0
+    if renewable_delivered < eff_d:
+        grid_purchased = eff_d - renewable_delivered
+
+    total_physical_production = s + w
+    physical_surplus = max(0.0, total_physical_production - renewable_delivered)
+    
+    if physical_surplus > 0:
+        battery.charge(physical_surplus)
+
+    # ==========================================
+    # 6. REGISTRO DE DATOS
+    # ==========================================
     history["hour"].append(t)
     history["demand"].append(d)
     history["solar_prod"].append(s)
     history["wind_prod"].append(w)
     history["battery_soc"].append(battery.soc)
     history["effective_demand"].append(eff_d)
-    history["solar_strategy"].append(solar_agent.action_to_strategy(s_action))
-    history["wind_strategy"].append(wind_agent.action_to_strategy(w_action))
-    
-    # Grid simplificado para el plot
-    history["grid_purchased"].append(max(0.0, eff_d - (s+w)))
+    history["solar_strategy"].append(solar_strategy)
+    history["wind_strategy"].append(wind_strategy)
+    history["grid_purchased"].append(grid_purchased)
 
 df_history = pd.DataFrame(history)
 
@@ -139,7 +197,10 @@ ax2.set_ylabel("Estado de Carga (%)", color="green")
 ax2.set_ylim(0, 105)
 ax2.legend(loc="upper right")
 
-plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana)- Competitivo")
+# Asegurar que el directorio de la imagen exista antes de guardar
+SAVE_PATH_IMG.parent.mkdir(parents=True, exist_ok=True)
+
+plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana) - Competitivo")
 plt.tight_layout()
 plt.savefig(str(SAVE_PATH_IMG), dpi=300, bbox_inches="tight")
 
