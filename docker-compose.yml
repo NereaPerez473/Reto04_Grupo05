@@ -1,18 +1,72 @@
 services:
+
+  # ------------------------------------------------------------------ #
+  # 1. Servidor Prefect — UI de monitorización en http://localhost:4200  #
+  # ------------------------------------------------------------------ #
   prefect-server:
     image: prefecthq/prefect:3-latest
     container_name: prefect_server_sqlite
     restart: always
-    # Forzamos el comando de inicio para asegurar que arranque
     entrypoint: ["prefect", "server", "start", "--host", "0.0.0.0"]
     environment:
-      - PREFECT_API_URL=http://127.0.0.1:4200/api
       - PREFECT_API_DATABASE_CONNECTION_URL=sqlite+aiosqlite:////root/.prefect/prefect.db
     ports:
       - "4200:4200"
     volumes:
       - prefect_data:/root/.prefect
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  # ------------------------------------------------------------------ #
+  # 2. Worker del pipeline — ETL → Inferencia → Precios → Optimización  #
+  #    Arranca cuando el servidor Prefect está listo, ejecuta el flow   #
+  #    y termina. Relanzar con: docker compose run --rm pipeline-worker  #
+  # ------------------------------------------------------------------ #
+  pipeline-worker:
+    build: .
+    container_name: pipeline_worker
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - APP_DIR=/app
+      - PYTHONPATH=/app:/app/models:/app/optimizacion
+      - MPLBACKEND=Agg
+    command: python pipeline/flow.py
+    volumes:
+      # Datos de entrada y salida (lectura/escritura)
+      - ./data:/app/data
+      # Modelos pre-entrenados (solo lectura; demasiado grandes para la imagen)
+      - ./models:/app/models:ro
+      # Directorio de optimizacion: el notebook escribe optuna_microred.db aqui
+      - ./optimizacion:/app/optimizacion
+    restart: "no"
+
+  # ------------------------------------------------------------------ #
+  # 3. Flask API — consulta persistente de resultados                   #
+  #    http://localhost:5000/api/optuna/studies                         #
+  #    http://localhost:5000/api/results/predicciones/eolico            #
+  # ------------------------------------------------------------------ #
+  flask-api:
+    build: .
+    container_name: flask_api
+    restart: always
+    environment:
+      - DATA_DIR=/app/data
+      - OPTUNA_DB=/app/optimizacion/optuna_microred.db
+      - PYTHONPATH=/app:/app/models:/app/optimizacion
+    command: python flask_api/app.py
+    ports:
+      - "5000:5000"
+    volumes:
+      # Solo lectura: la API no modifica los datos
+      - ./data:/app/data:ro
+      - ./optimizacion:/app/optimizacion:ro
 
 volumes:
   prefect_data:
- 
