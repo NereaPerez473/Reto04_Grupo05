@@ -223,7 +223,7 @@ for episode in range(N_EPISODES):
         solar_declared_excess = max(0.0, solar_declared - solar_power)
         wind_declared_excess  = max(0.0, wind_declared  - wind_power)
 
-        # NUEVO: Castigo dinámico por vulnerabilidad de la red
+        # Castigo dinámico por vulnerabilidad de la red
         dynamic_penalty_factor = 3.0 - (2.0 * battery.soc)
 
         # Aplicamos el factor dinámico en lugar del 2.0 fijo

@@ -209,7 +209,7 @@ for episode in range(N_EPISODES):
 
         battery_savings = battery_contribution * current_price
 
-        # NUEVO: Castigo dinámico por vulnerabilidad de la red
+        # Castigo dinámico por vulnerabilidad de la red
         dynamic_penalty_factor = 3.0 - (2.0 * battery.soc)
 
         shared_reward = (

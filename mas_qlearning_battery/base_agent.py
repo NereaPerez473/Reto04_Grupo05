@@ -17,8 +17,7 @@ Protocolo FIPA-ACL por timestep
    (solo si accept)
 
 El INFORM reporta la entrega REAL, que puede ser menor que C si el agente
-usó estrategia de engaño (deception). Esta discrepancia es el dato clave
-para el análisis comparativo de estrategias.
+usó estrategia de engaño (deception). 
 """
 
 import socket
@@ -38,7 +37,7 @@ class ProducerAgent:
 
     Parámetros
     ----------
-    name           : str    Nombre del agente (p.ej. "AgenteSolar").
+    name           : str    Nombre del agente.
     port           : int    Puerto TCP donde escucha.
     csv_path       : str    Ruta al CSV con predicciones de potencia.
     power_column   : str    Nombre de la columna de potencia en el CSV.
@@ -58,7 +57,7 @@ class ProducerAgent:
         self.last_action = None
         self.last_demand = 40.0
         self.last_price = 0.15
-        self.last_soc = 0.5  # NUEVO: Memoria para el SoC recibido
+        self.last_soc = 0.5  # Memoria para el SoC
         self.bluff_factor = bluff_factor
         self.hide_factor = hide_factor
 
@@ -99,7 +98,7 @@ class ProducerAgent:
         real_power = self._get_real_power()
 
         # =================================================================
-        # MAGIA DINÁMICA: Inyección de la estrategia correcta
+        # Inyección de la estrategia correcta
         # =================================================================
         # Si la tabla cargada por el agente (ej. SolarAgent) tiene 5 dimensiones,
         # significa que es el modelo de Negociación. Comprobamos si el learner
@@ -112,7 +111,7 @@ class ProducerAgent:
             self.learner = new_learner
 
         # =================================================================
-        # OBTENCIÓN DEL ESTADO (Agnóstico)
+        # OBTENCIÓN DEL ESTADO 
         # =================================================================
         if self.learner.q_table.ndim == 5:
             # Modelo de Negociación (4 variables de estado)
@@ -174,7 +173,7 @@ class ProducerAgent:
         self.last_price = float(
             content["import_price_eur_kwh"]
         )
-        # NUEVO: Extraer el SoC de la batería del mensaje CFP
+        # Extraer el SoC de la batería del mensaje CFP
         self.last_soc = float(
             content["battery_soc"]
         )
@@ -214,13 +213,11 @@ class ProducerAgent:
         revenue          = actual_delivered * agreed_price
 
         # ==========================================
-        # REWARD Q-LEARNING (Con Castigo Dinámico)
+        # REWARD Q-LEARNING 
         # ==========================================
         
         dynamic_penalty_factor = 3.0 - (2.0 * self.last_soc)
         
-        # Ojo: En base_agent.py tu código original no multiplicaba por el precio, 
-        # pero es fundamental que el cálculo sea idéntico al entrenamiento.
         reward = (
             revenue
             - (dynamic_penalty_factor * shortfall * agreed_price) 

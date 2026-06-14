@@ -15,10 +15,10 @@ from pathlib import Path
 
 from simple_battery import SimpleBattery
 from strategy_qlearning_battery import StrategyQLearning 
-from strategies import NegotiationStrategies # NUEVO: Necesario para la subasta
+from strategies import NegotiationStrategies 
 
 # ==================================================
-# RUTAS Y DATOS (Ajusta según tu estructura)
+# RUTAS Y DATOS 
 # ==================================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 SOLAR_CSV = BASE_DIR / "data" / "results" / "Predicciones_Solar.csv"
@@ -26,8 +26,7 @@ WIND_CSV  = BASE_DIR / "data" / "results" / "Predicciones_Eolico.csv"
 LOAD_CSV  = BASE_DIR / "data" / "raw" / "demanda_restaurante.csv"
 PRICE_CSV = BASE_DIR / "data" / "raw" / "Precios" / "precio2025-peninsula.csv"
 
-# Cargar Q-Tables ya entrenadas (ejemplo: Competitivo)
-# IMPORTANTE: Asegúrate de tener los .npy generados tras los 5000 episodios
+# Cargar Q-Tables ya entrenadas
 QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_solar_qtable.npy"
 QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_wind_qtable.npy"
 
@@ -206,5 +205,5 @@ plt.savefig(str(SAVE_PATH_IMG), dpi=300, bbox_inches="tight")
 
 plt.show()
 
-# Guardar el CSV paso a paso para Excel/Tableau si lo necesitas
+# Guardar el CSV paso a paso
 df_history.to_csv(str(SAVE_PATH_CSV), index=False)

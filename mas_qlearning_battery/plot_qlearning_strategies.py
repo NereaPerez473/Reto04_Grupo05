@@ -1,10 +1,11 @@
+"""plot_qlearning_strategies.py"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 
-# Configuración estética para TFM
 sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
 
 # ==================================================

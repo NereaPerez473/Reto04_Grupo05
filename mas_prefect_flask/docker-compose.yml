@@ -1,0 +1,53 @@
+services:
+
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+
+    container_name: prefect_server
+
+    restart: always
+
+    entrypoint:
+      ["prefect", "server", "start", "--host", "0.0.0.0"]
+
+    ports:
+      - "4200:4200"
+
+    environment:
+      - PREFECT_API_DATABASE_CONNECTION_URL=sqlite+aiosqlite:////root/.prefect/prefect.db
+
+    volumes:
+      - prefect_data:/root/.prefect
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  flask-api:
+
+    build: ./flask_app
+
+    container_name: flask_api
+
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+
+    ports:
+      - "5000:5000"
+
+    command: python app.py
+
+    volumes:
+      - ../:/project
+
+    restart: always
+
+volumes:
+  prefect_data:

@@ -304,9 +304,9 @@ class ConsumerAgent:
                 self.history.append({
                     "timestep":               t,
                     "demand_kw":              round(demand, 4),
-                    "effective_demand_kw":    round(effective_demand, 4), # NUEVO
-                    "battery_soc":            round(self.battery.soc, 4), # NUEVO
-                    "battery_charged_kw":     round(battery_charged_kw, 4), # NUEVO
+                    "effective_demand_kw":    round(effective_demand, 4), 
+                    "battery_soc":            round(self.battery.soc, 4), 
+                    "battery_charged_kw":     round(battery_charged_kw, 4), 
                     "curtailed_energy_kw":    round(curtailed_kw, 4),
                     "import_price_eur_kwh":   round(import_price, 6),
                     # Solar
