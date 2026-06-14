@@ -1,0 +1,5 @@
+flask
+prefect
+pandas
+matplotlib
+numpy
