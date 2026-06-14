@@ -37,8 +37,10 @@ from flask import Flask, abort, jsonify, render_template_string, request, send_f
 
 app = Flask(__name__)
 
+# Lee rutas desde variables de entorno
 DATA_DIR   = Path(os.environ.get("DATA_DIR",  "/app/data"))
 OPTUNA_DB  = Path(os.environ.get("OPTUNA_DB", "/app/optimizacion/optuna_microred.db"))
+
 OPTIM_DIR  = DATA_DIR / "results" / "optimizacion"
 PLOTS_DIR  = OPTIM_DIR / "plots"
 METRICS_FILE = OPTIM_DIR / "metricas_calidad.json"
@@ -47,7 +49,7 @@ METRICS_FILE = OPTIM_DIR / "metricas_calidad.json"
 def _storage_url() -> str:
     return f"sqlite:///{OPTUNA_DB}"
 
-
+# Lee un CSV con pandas y lo devuelve como lista de dicts
 def _csv(path: Path, sep: str = ",", nrows: int | None = None) -> list[dict]:
     """Read a CSV and return it as a list of dicts."""
     if not path.exists():
@@ -55,7 +57,7 @@ def _csv(path: Path, sep: str = ",", nrows: int | None = None) -> list[dict]:
     df = pd.read_csv(path, sep=sep, nrows=nrows)
     return df.where(df.notna(), None).to_dict(orient="records")
 
-
+# Carga el JSON con métricas de calidad de los algoritmos
 def _load_metrics() -> dict:
     """Load metricas_calidad.json; return {} if missing."""
     if not METRICS_FILE.exists():
@@ -63,7 +65,7 @@ def _load_metrics() -> dict:
     with open(METRICS_FILE, encoding="utf-8") as f:
         return json.load(f)
 
-
+# Lee una imagen PNG y la convierte a data-URI base64 (es para poder poner la imagen en el HTML)
 def _img_b64(path: Path) -> str | None:
     """Read a PNG and return a data-URI string, or None if missing."""
     if not path.exists():
@@ -72,9 +74,7 @@ def _img_b64(path: Path) -> str | None:
     return f"data:image/png;base64,{data}"
 
 
-# ---------------------------------------------------------------------------
-# Health check
-# ---------------------------------------------------------------------------
+# Función que indica si existe la base de datos de optuna, el directorio de datos, el archivo de métricas y el directorio de plots
 @app.get("/health")
 def health():
     return jsonify({
@@ -85,117 +85,114 @@ def health():
         "plots_dir_exists": PLOTS_DIR.exists(),
     })
 
+#### OPTUNA
 
-# ---------------------------------------------------------------------------
-# Optuna
-# ---------------------------------------------------------------------------
-@app.get("/api/optuna/studies")
+@app.get("/api/optuna/studies") # Cuando se hace una peticion a la URL /api/optuna/studies, se llama a la función get_studies()
 def get_studies():
     """List all studies with trial summary."""
-    if not OPTUNA_DB.exists():
+    if not OPTUNA_DB.exists(): # Mira si existe la bd de optuna
         return jsonify([])
 
-    summaries = optuna.get_all_study_summaries(storage=_storage_url())
-    metrics   = _load_metrics()
-    result    = []
-    for s in summaries:
-        # Try to match study name to an algorithm key in metrics
-        algo_key = _guess_algo_key(s.study_name, metrics)
-        hv = metrics.get(algo_key, {}).get("HV_normalizado") if algo_key else None
-        entry = {
+    summaries = optuna.get_all_study_summaries(storage=_storage_url()) # Resumen de todos los estudios de Optuna (Se conecta a esa base de datos SQLite y extrae una lista con el resumen de todos los estudios que existan)
+    metrics   = _load_metrics() # Carga las métricas de calidad de los algoritmos desde el archivo JSON
+    result    = [] # Lista vacia para guardar la información limpia
+
+    for s in summaries: # Recorre uno a uno los estudios
+        algo_key = _guess_algo_key(s.study_name, metrics) # Encuentra el nombre del algoritmo (busca si alguna palabra del nombre del estudio coincide con las claves del JSON de métricas)
+        hv = metrics.get(algo_key, {}).get("HV_normalizado") if algo_key else None # Extrae el Hipervolumen Normalizado
+        entry = { # Crea un diccionario limpio por cada estudio
             "name":       s.study_name,
             "n_trials":   s.n_trials,
             "start_date": str(s.datetime_start) if s.datetime_start else None,
             "hypervolume": hv,
         }
-        result.append(entry)
-    return jsonify(result)
+        result.append(entry) # Mete el diccionario dentro de la lista result
+    return jsonify(result) # Convierte la lista en JSON y devuelve el JSON
 
-
+# Función para vincular un estudio de Optuna con su algoritmo correspondiente en el archivo de métricas (conseguir el nombre del algoritmo)
 def _guess_algo_key(study_name: str, metrics: dict) -> str | None:
     """Try to match study_name to a key in the metrics dict (case-insensitive substring)."""
-    name_upper = study_name.upper()
-    for key in metrics:
-        if key.upper() in name_upper or name_upper in key.upper():
-            return key
+    name_upper = study_name.upper() # Convierte todo el nombre del estudio a mayúsculas y lo guarda en name_upper
+    for key in metrics: # Recorre una a una las keys del diccionario metrics
+        if key.upper() in name_upper or name_upper in key.upper(): # Pasa la key a mayusculas y comprueba si la key está dentro del nombre del estudio o si el nombre del estudio esta dentro de la key
+            return key # Si se cumple devuelve la key (el nombre del algoritmo)
     return None
 
 
-@app.get("/api/optuna/studies/<study_name>/trials")
+@app.get("/api/optuna/studies/<study_name>/trials") # Cambia segun el estudio que vamos a consultar
 def get_trials(study_name: str):
     """
     All trials for a study.
     ?state=COMPLETE  filters by state (COMPLETE, RUNNING, FAIL, WAITING).
     """
-    if not OPTUNA_DB.exists():
+    if not OPTUNA_DB.exists(): # Comprueba si existe la base de datos de Optuna, si no existe devuelve un JSON vacío
         return jsonify([])
 
-    try:
+    try: # Intenta cargar el estudio
         study = optuna.load_study(study_name=study_name, storage=_storage_url())
     except Exception:
         abort(404, description=f"Study '{study_name}' not found.")
 
-    state  = request.args.get("state", "").upper() or None
-    trials = study.trials
+    state  = request.args.get("state", "").upper() or None # Consigue esl estado en mayusculas (COMPLETE, RUNNING, FAIL, WAITING)
+    trials = study.trials # Consigue todos los trials del estudio
 
-    def _trial_dict(t: optuna.trial.FrozenTrial) -> dict:
+    def _trial_dict(t: optuna.trial.FrozenTrial) -> dict: # Función que con los trials de Optuna crea un diccionario
         return {
-            "number":     t.number,
-            "state":      t.state.name,
-            "value":      t.value,
-            "values":     t.values,
-            "params":     t.params,
-            "start_date": str(t.datetime_start)    if t.datetime_start    else None,
-            "end_date":   str(t.datetime_complete) if t.datetime_complete else None,
-            "duration_s": (
+            "number":     t.number, # El número de trial
+            "state":      t.state.name, # El estado del trial (COMPLETE, RUNNING, FAIL, WAITING)
+            "value":      t.value, # El valor del hipervolumen del trial
+            "values":     t.values, # Lista de valores del trial (en caso de que sea multiobjetivo)
+            "params":     t.params, # Diccionario con los hiperparámetros
+            "start_date": str(t.datetime_start)    if t.datetime_start    else None, # Fecha y hora de inicio en texto
+            "end_date":   str(t.datetime_complete) if t.datetime_complete else None, # Fecha y hora de finalización en texto
+            "duration_s": ( # Duración del trial
                 (t.datetime_complete - t.datetime_start).total_seconds()
                 if t.datetime_start and t.datetime_complete
                 else None
             ),
         }
 
-    data = [
+    data = [ # Se filtran los trials por estado (si se ha especificado) y si no se especifica se devuelven todos los trials
         _trial_dict(t)
         for t in trials
         if state is None or t.state.name == state
     ]
     return jsonify({"study": study_name, "n_trials": len(data), "trials": data})
 
-
+# Consigue la información del mejor trial del estudio
 @app.get("/api/optuna/studies/<study_name>/best")
 def get_best_trial(study_name: str):
     """Best trial of a single-objective study."""
-    if not OPTUNA_DB.exists():
+    if not OPTUNA_DB.exists(): # Comprueba si existe el estudio
         abort(404, description="Optuna database not found.")
     try:
-        study = optuna.load_study(study_name=study_name, storage=_storage_url())
-        bt    = study.best_trial
+        study = optuna.load_study(study_name=study_name, storage=_storage_url()) # Carga el estudio
+        bt    = study.best_trial # Consigue el mejor trial del estudio
     except Exception as exc:
         abort(400, description=str(exc))
     return jsonify({
-        "study":      study_name,
-        "best_trial": bt.number,
-        "value":      bt.value,
-        "params":     bt.params,
+        "study":      study_name, # El nombre del estudio
+        "best_trial": bt.number, # El número de trial
+        "value":      bt.value, # El valor del hipervolumen del mejor trial
+        "params":     bt.params, # Los hiperparámetros del mejor trial
     })
 
-
+# Consigue los hiperparametros del mejor trial del estudio
 @app.get("/api/optuna/studies/<study_name>/params")
 def get_best_params(study_name: str):
     """Optimal parameters (best_params) of a single-objective study."""
-    if not OPTUNA_DB.exists():
+    if not OPTUNA_DB.exists(): # Comprueba si existe el estudio
         abort(404, description="Optuna database not found.")
     try:
-        study  = optuna.load_study(study_name=study_name, storage=_storage_url())
-        params = study.best_params
+        study  = optuna.load_study(study_name=study_name, storage=_storage_url()) # Carga el estudio
+        params = study.best_params # Extrae los hiperparámetros del trial con mejor hipervolumen
     except Exception as exc:
         abort(400, description=str(exc))
-    return jsonify({"study": study_name, "best_params": params})
+    return jsonify({"study": study_name, "best_params": params}) # Devuelve un JSON con el nombre del estudio y los hiperparámetros del mejor trial
 
+#### PREDICCIONES
 
-# ---------------------------------------------------------------------------
-# Power predictions
-# ---------------------------------------------------------------------------
+# Es para justar los archivos de las predicciones con las variables de entrada
 _PRED_FILES = {
     "wind":  "Predicciones_Eolico.csv",
     "solar": "Predicciones_Solar.csv",
@@ -206,29 +203,18 @@ _FEAT_FILES = {
     "solar": "Features_Solar.csv",
 }
 
-
 def _merge_features_predictions(
     source: str, nrows: int | None = None
 ) -> tuple[pd.DataFrame | None, list[str], str | None]:
-    """
-    Load and join Features_*.csv with Predicciones_*.csv on the Date column
-    (or by positional index if Date is absent in one of them).
+    feat_path = DATA_DIR / "processed" / _FEAT_FILES[source] # Ruta al archivo de características
+    pred_path = DATA_DIR / "results"   / _PRED_FILES[source] # Ruta al archivo de predicciones
 
-    Returns:
-        df          – merged DataFrame (or None if both files missing)
-        feat_cols   – list of feature column names (to style them differently)
-        pred_col    – name of the prediction column (last col of predictions file)
-    """
-    feat_path = DATA_DIR / "processed" / _FEAT_FILES[source]
-    pred_path = DATA_DIR / "results"   / _PRED_FILES[source]
+    df_feat = _load_csv_df(feat_path) # Cargar el csv en dataframe
+    df_pred = _load_csv_df(pred_path) # Cargar el csv en dataframe
 
-    df_feat = _load_csv_df(feat_path)
-    df_pred = _load_csv_df(pred_path)
-
+    # Comprobar que existen los dos
     if df_feat is None and df_pred is None:
         return None, [], None
-
-    # If only one is available, return it as-is
     if df_feat is None:
         df = df_pred
         return df.head(nrows) if nrows else df, [], df.columns[-1]
@@ -236,31 +222,28 @@ def _merge_features_predictions(
         df = df_feat
         return df.head(nrows) if nrows else df, list(df.columns), None
 
-    # Determine join key
-    JOIN_COL = "Date"
-    if JOIN_COL in df_feat.columns and JOIN_COL in df_pred.columns:
+    JOIN_COL = "Date" # Columna para juntar los dos dataframes
+    if JOIN_COL in df_feat.columns and JOIN_COL in df_pred.columns: # Si la columna Date está en los dos archivos
+        # Convertir las fechas a texto
         df_feat[JOIN_COL] = df_feat[JOIN_COL].astype(str)
         df_pred[JOIN_COL] = df_pred[JOIN_COL].astype(str)
-        # Prediction columns excluding the key
+        # Identifica las columnas del archivo de predicciones quitando la fecha
         pred_cols_no_key = [c for c in df_pred.columns if c != JOIN_COL]
-        df = df_feat.merge(df_pred[pred_cols_no_key + [JOIN_COL]], on=JOIN_COL, how="left")
-    else:
-        # Positional join — reset index and concat side-by-side
+        df = df_feat.merge(df_pred[pred_cols_no_key + [JOIN_COL]], on=JOIN_COL, how="left") # Junta con el otro dataframe usando la columna Date
+    else: # Si no exsite la columna date se unen por posicion
         pred_cols_no_key = list(df_pred.columns)
         df = pd.concat(
             [df_feat.reset_index(drop=True), df_pred.reset_index(drop=True)],
             axis=1,
         )
-
-    feat_cols = list(df_feat.columns)
-    pred_col  = pred_cols_no_key[-1] if pred_cols_no_key else None
-
+    feat_cols = list(df_feat.columns) # Guarda una lista con los nombres de las columnas que venían originalmente en el archivo de características
+    pred_col  = pred_cols_no_key[-1] if pred_cols_no_key else None # Guarda el nombre de la última columna del archivo de predicciones (la que contiene la predicción)
     if nrows:
-        df = df.head(nrows)
+        df = df.head(nrows) # Coge las primeras n filas del dataframe
     return df, feat_cols, pred_col
 
 
-@app.get("/api/results/predicciones/<source>")
+@app.get("/api/results/predicciones/<source>") # Source es solar o wind
 def get_predicciones(source: str):
     """
     Returns input features joined with power predictions for the given source.
@@ -269,22 +252,21 @@ def get_predicciones(source: str):
     if source not in _PRED_FILES:
         abort(404)
     nrows = request.args.get("n", type=int)
-    df, feat_cols, pred_col = _merge_features_predictions(source, nrows)
+    df, feat_cols, pred_col = _merge_features_predictions(source, nrows) # Consigue los datos juntos con la función anterior
     if df is None:
         return jsonify({"source": source, "records": 0, "feature_cols": [], "prediction_col": None, "data": []})
-    data = df.where(df.notna(), None).to_dict(orient="records")
+    data = df.where(df.notna(), None).to_dict(orient="records") # Convierte el dataframe a una lista de diccionarios (cada fila es un diccionario)
     return jsonify({
-        "source":         source,
-        "records":        len(data),
-        "feature_cols":   feat_cols,
-        "prediction_col": pred_col,
-        "data":           data,
+        "source":         source, # La fuente
+        "records":        len(data), # Número de registros
+        "feature_cols":   feat_cols, # Lista de nombres de las columnas de características
+        "prediction_col": pred_col, # Nombre de la columna de predicción
+        "data":           data, # Lista de diccionarios con los datos
     })
 
 
-# ---------------------------------------------------------------------------
-# Agent prices
-# ---------------------------------------------------------------------------
+#### PRECIOS
+
 _PRECIO_FILES = {
     "wind":  "precio_eolico_mwh.csv",
     "solar": "precio_solar_mwh.csv",
@@ -301,22 +283,18 @@ def get_precios(source: str):
         abort(404)
     nrows = request.args.get("n", type=int)
     path  = DATA_DIR / "processed" / "Precios" / _PRECIO_FILES[source]
-    data  = _csv(path, sep=";", nrows=nrows)
-    return jsonify({"source": source, "records": len(data), "data": data})
+    data  = _csv(path, sep=";", nrows=nrows) # Lee el csv
+    return jsonify({"source": source, "records": len(data), "data": data}) # devuelve la info
 
 
-# ---------------------------------------------------------------------------
-# Quality metrics
-# ---------------------------------------------------------------------------
+#### MÉTRICAS DE CALIDAD
 @app.get("/api/results/metrics")
 def get_metrics():
     """Returns the algorithm quality metrics from metricas_calidad.json."""
-    return jsonify(_load_metrics())
+    return jsonify(_load_metrics()) # Carga las métricas de calidad desde el archivo JSON y las devuelve en formato JSON
 
 
-# ---------------------------------------------------------------------------
-# Pareto plot endpoint (serve PNG by algorithm name)
-# ---------------------------------------------------------------------------
+#### VISUALIZAR LOS FRENTES DE PARETO
 _PARETO_PLOT_MAP = {
     "nsgaii": "pareto_nsgaii.png",
     "nsga2":  "pareto_nsgaii.png",
@@ -324,22 +302,19 @@ _PARETO_PLOT_MAP = {
     "comparative": "pareto_comparativo.png",
 }
 
-
 @app.get("/api/results/pareto-plot/<algorithm>")
 def get_pareto_plot(algorithm: str):
-    key  = algorithm.lower().replace("-", "").replace("_", "")
-    name = _PARETO_PLOT_MAP.get(key)
+    key  = algorithm.lower().replace("-", "").replace("_", "") # Convierte el nombre del algoritmo a minúsculas y quita guiones y guiones bajos
+    name = _PARETO_PLOT_MAP.get(key) # Busca la key limpia dentro del diccionario _PARETO_PLOT_MAP
     if not name:
         abort(404, description=f"No plot registered for algorithm '{algorithm}'.")
-    path = PLOTS_DIR / name
+    path = PLOTS_DIR / name # consigue el path del archivo de imagen
     if not path.exists():
         abort(404, description=f"Plot file '{name}' not found on disk.")
-    return send_file(path, mimetype="image/png")
+    return send_file(path, mimetype="image/png") # Envia la imagen
 
 
-# ---------------------------------------------------------------------------
-# Dashboard HTML
-# ---------------------------------------------------------------------------
+#### Dashboard HTML
 _DASHBOARD_HTML = r"""
 <!DOCTYPE html>
 <html lang="en">
@@ -615,7 +590,7 @@ function switchTab(e, group, targetId) {
 </html>
 """
 
-
+# De dataframe a HTML (para poder mostrarlo en el dashboard)
 def _df_to_html(df: pd.DataFrame, nrows: int = 50) -> str:
     return (
         df.head(nrows)
@@ -623,21 +598,16 @@ def _df_to_html(df: pd.DataFrame, nrows: int = 50) -> str:
         .replace('<table ', '<table style="width:100%" ')
     )
 
-
-def _pred_to_html(
-    df: pd.DataFrame,
-    feat_cols: list[str],
-    pred_col: str | None,
-    nrows: int = 50,
-) -> str:
+# La tabla de las predicciones en HTML (para poder mostrarlo en el dashboard)
+def _pred_to_html(df: pd.DataFrame, feat_cols: list[str], pred_col: str | None, nrows: int = 50) -> str:
     """
     Render a merged features+prediction DataFrame as HTML.
     Feature columns get a light-blue header; the prediction column gets a green header.
     """
-    df = df.head(nrows)
-    feat_set = set(feat_cols)
+    df = df.head(nrows) # Recorta la tabla para quedarse solo con las primeras filas
+    feat_set = set(feat_cols) # Convierte la lista de características en un conjunto
 
-    # Build <thead>
+    # Construcción del Encabezado
     headers = []
     for col in df.columns:
         if col == pred_col:
@@ -648,6 +618,7 @@ def _pred_to_html(
             style = 'style="white-space:nowrap;"'
         headers.append(f"<th {style}>{col}</th>")
 
+    # Construcción de las Filas
     rows = []
     for _, row in df.iterrows():
         cells = []
@@ -670,13 +641,13 @@ def _pred_to_html(
     )
     return html
 
-
+# Lee un csv y devuelve un dataframe
 def _load_csv_df(path: Path, sep: str = ",") -> pd.DataFrame | None:
     if not path.exists():
         return None
     return pd.read_csv(path, sep=sep)
 
-
+# Recorre todos los algoritmos y extrae el mejor valor de una métrica dada (recorre un diccionario con los resultados de cada algoritmo)
 def _best_metric(metrics: dict, key: str, maximize: bool = True):
     """Return the best value across all algorithms for a given metric key."""
     vals = [m.get(key) for m in metrics.values() if m.get(key) is not None]
@@ -684,20 +655,19 @@ def _best_metric(metrics: dict, key: str, maximize: bool = True):
         return None
     return max(vals) if maximize else min(vals)
 
-
+# FUNCION PRINCIPAL: orquestar y recolectar todos los datos
 @app.get("/")
 def dashboard():
-    # --- Optuna studies ---
     studies = []
-    db_ok   = OPTUNA_DB.exists()
-    metrics = _load_metrics()
+    db_ok   = OPTUNA_DB.exists() # Comprueba si existe la base de datos de Optuna
+    metrics = _load_metrics() # Carga las métricas de calidad de los algoritmos desde el archivo JSON
 
     if db_ok:
         try:
-            for s in optuna.get_all_study_summaries(storage=_storage_url()):
-                algo_key = _guess_algo_key(s.study_name, metrics)
-                hv = metrics.get(algo_key, {}).get("HV_normalizado") if algo_key else None
-                studies.append({
+            for s in optuna.get_all_study_summaries(storage=_storage_url()): # Recorre todos los estudios de Optuna y extrae la información relevante
+                algo_key = _guess_algo_key(s.study_name, metrics) # Encuentra el nombre del algoritmo (busca si alguna palabra del nombre del estudio coincide con las claves del JSON de métricas)
+                hv = metrics.get(algo_key, {}).get("HV_normalizado") if algo_key else None # Extrae el Hipervolumen Normalizado
+                studies.append({ # Crea un diccionario limpio por cada estudio
                     "name":        s.study_name,
                     "n_trials":    s.n_trials,
                     "start_date":  str(s.datetime_start) if s.datetime_start else None,
@@ -706,24 +676,24 @@ def dashboard():
         except Exception:
             pass
 
-    # --- Best values per metric (for table highlighting) ---
+    # Mejores métricas
     best_hv     = _best_metric(metrics, "HV_normalizado", maximize=True)
     best_gd     = _best_metric(metrics, "GD",             maximize=False)
     best_igd    = _best_metric(metrics, "IGD",            maximize=False)
     best_spread = _best_metric(metrics, "Spread",         maximize=False)
 
-    # --- Pareto plots (embedded as base64) ---
+    # Frentes de pareto
     pareto_plots = {
         "NSGA-II":      _img_b64(PLOTS_DIR / "pareto_nsgaii.png"),
         "SPEA2":        _img_b64(PLOTS_DIR / "pareto_spea2.png"),
         "Comparative":  _img_b64(PLOTS_DIR / "pareto_comparativo.png"),
     }
 
-    # --- Predictions merged with input features ---
+    # Combinar las predicciones con las características de entrada
     df_pw, feat_cols_w, pred_col_w = _merge_features_predictions("wind")
     df_ps, feat_cols_s, pred_col_s = _merge_features_predictions("solar")
 
-    # --- Prices ---
+    # Precios
     df_cw = _load_csv_df(DATA_DIR / "processed" / "Precios" / "precio_eolico_mwh.csv", sep=";")
     df_cs = _load_csv_df(DATA_DIR / "processed" / "Precios" / "precio_solar_mwh.csv",  sep=";")
 
@@ -743,9 +713,5 @@ def dashboard():
         prec_solar   = _df_to_html(df_cs) if df_cs is not None else None,
     )
 
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
