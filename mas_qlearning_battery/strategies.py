@@ -3,9 +3,7 @@ strategies.py
 =============
 Estrategias de negociación para agentes productores de energía.
 
-Inspirado en el patrón de la profesora (05bluffing.py) pero adaptado al
-dominio energético: en lugar de buyer/seller con un precio único, cada
-estrategia define cómo un productor declara su potencia disponible y
+Cada estrategia define cómo un productor declara su potencia disponible y
 a qué precio la oferta.
 
 Cada estrategia recibe:

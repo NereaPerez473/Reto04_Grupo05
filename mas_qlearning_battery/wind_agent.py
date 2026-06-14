@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 
 PORT_WIND = 5002
-# .parent.parent es la carpeta raíz 'Reto04_Grupo05'
+# Carpeta raíz 'Reto04_Grupo05'
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_CSV = BASE_DIR/"data"/"results"/"Predicciones_Eolico.csv"
 
@@ -49,7 +49,7 @@ class WindAgent(ProducerAgent):
                  strategy_name: str = "honest",
                  bluff_factor: float = 1.3,
                  hide_factor: float = 0.70,
-                 qtable_path: str = None): # NUEVO PARÁMETRO
+                 qtable_path: str = None): 
         super().__init__(
             name="AgenteEolico",
             port=PORT_WIND,
@@ -62,7 +62,7 @@ class WindAgent(ProducerAgent):
 
         self.learner.epsilon = 0.0  # Modo explotación por defecto
 
-        # NUEVO: Carga dinámica y segura de la Q-Table
+        # Carga dinámica y segura de la Q-Table
         if qtable_path:
             try:
                 self.learner.q_table = np.load(qtable_path)

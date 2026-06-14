@@ -38,7 +38,7 @@ from consumer_agent import ConsumerAgent
 from simple_battery import SimpleBattery
 from pathlib import Path
 
-# .parent.parent es la carpeta raíz 'Reto04_Grupo05'
+# Carpeta raíz 'Reto04_Grupo05'
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Rutas por defecto
@@ -51,7 +51,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def run_simulation(
-    mode: str = "competitive", # NUEVO
+    mode: str = "competitive", 
     strategy_as: str = "honest",
     strategy_ae: str = "honest",
     n_steps: int = 500,
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Simulación MAS microred energética con negociación FIPA-ACL"
     )
-    # NUEVO: Selector de experimento
+    # Selector de experimento
     parser.add_argument(
         "--mode", default="competitive",
         choices=["competitive", "cooperative", "negotiation"],
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_simulation(
-        mode=args.mode, # NUEVO
+        mode=args.mode, 
         strategy_as=args.strategy_as,
         strategy_ae=args.strategy_ae,
         n_steps=args.n_steps,

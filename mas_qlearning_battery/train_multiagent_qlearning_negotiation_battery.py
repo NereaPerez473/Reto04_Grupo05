@@ -132,7 +132,7 @@ for episode in range(N_EPISODES):
         # ==========================================
         # 2. ESTADOS (Usando effective_demand)
         # ==========================================
-        # Observa que mantenemos la 3ª dimensión de producción propia específica de este script
+        # Mantenemos la 3ª dimensión de producción propia específica de este script
         solar_state = solar_agent.get_state(
             effective_demand, current_price, solar_power, battery.soc
         )
@@ -236,7 +236,7 @@ for episode in range(N_EPISODES):
         market_bonus_solar = MARKET_BONUS_FACTOR * solar_allocated * current_price
         market_bonus_wind  = MARKET_BONUS_FACTOR * wind_allocated  * current_price
 
-        # NUEVO: Castigo dinámico por vulnerabilidad de la red
+        # Castigo dinámico por vulnerabilidad de la red
         dynamic_penalty_factor = 3.0 - (2.0 * battery.soc)
 
         solar_reward = (
