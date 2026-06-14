@@ -47,33 +47,33 @@ WINDOW = 50
 def plot_learning_curve(metric, title, filename, ylabel="Euros (€)"):
     plt.figure(figsize=(10, 6))
     
-    plt.plot(competitive_df["episode"], competitive_df[metric].rolling(WINDOW).mean(), label="Competitivo", alpha=0.8)
-    plt.plot(cooperative_df["episode"], cooperative_df[metric].rolling(WINDOW).mean(), label="Cooperativo", alpha=0.8)
-    plt.plot(negotiation_df["episode"], negotiation_df[metric].rolling(WINDOW).mean(), label="Negociación (Bonus)", alpha=0.8)
+    plt.plot(competitive_df["episode"], competitive_df[metric].rolling(WINDOW).mean(), label="Competitive", alpha=0.8)
+    plt.plot(cooperative_df["episode"], cooperative_df[metric].rolling(WINDOW).mean(), label="Cooperative", alpha=0.8)
+    plt.plot(negotiation_df["episode"], negotiation_df[metric].rolling(WINDOW).mean(), label="Negotiation", alpha=0.8)
     
-    plt.title(f"{title} (Media Móvil N={WINDOW})", fontweight='bold')
-    plt.xlabel("Episodio")
+    plt.title(f"{title} (Moving Average N={WINDOW})", fontweight='bold')
+    plt.xlabel("Episode")
     plt.ylabel(ylabel)
     plt.legend()
     plt.tight_layout()
     plt.savefig(PLOTS_DIR / filename)
     plt.close()
 
-plot_learning_curve("solar_reward", "Convergencia de Recompensa: Agente Solar", "01_reward_solar.png")
-plot_learning_curve("wind_reward", "Convergencia de Recompensa: Agente Eólico", "02_reward_wind.png")
-plot_learning_curve("total_reward", "Recompensa Total del Sistema", "03_reward_total.png")
+plot_learning_curve("solar_reward", "Reward Convergence: Solar Agent", "01_reward_solar.png")
+plot_learning_curve("wind_reward", "Reward Convergence: Wind Agent", "02_reward_wind.png")
+plot_learning_curve("total_reward", "Total System Reward", "03_reward_total.png")
 
 # ==================================================
 # 2. MÉTRICAS FÍSICAS: DEPENDENCIA DE LA RED
 # ==================================================
 plt.figure(figsize=(10, 6))
-plt.plot(competitive_df["episode"], competitive_df["grid_purchased_kwh"].rolling(WINDOW).mean(), label="Competitivo", color="red", alpha=0.7)
-plt.plot(cooperative_df["episode"], cooperative_df["grid_purchased_kwh"].rolling(WINDOW).mean(), label="Cooperativo", color="green", alpha=0.7)
-plt.plot(negotiation_df["episode"], negotiation_df["grid_purchased_kwh"].rolling(WINDOW).mean(), label="Negociación", color="blue", alpha=0.7)
+plt.plot(competitive_df["episode"], competitive_df["grid_purchased_kwh"].rolling(WINDOW).mean(), label="Competitive", color="red", alpha=0.7)
+plt.plot(cooperative_df["episode"], cooperative_df["grid_purchased_kwh"].rolling(WINDOW).mean(), label="Cooperative", color="green", alpha=0.7)
+plt.plot(negotiation_df["episode"], negotiation_df["grid_purchased_kwh"].rolling(WINDOW).mean(), label="Negotiation", color="blue", alpha=0.7)
 
-plt.title(f"Dependencia Energética de la Red Eléctrica (Media Móvil N={WINDOW})", fontweight='bold')
-plt.xlabel("Episodio")
-plt.ylabel("Energía Comprada a Red (kWh)")
+plt.title(f"Energy Dependency on the Electrical Grid (Moving Average N={WINDOW})", fontweight='bold')
+plt.xlabel("Episode")
+plt.ylabel("Energy Purchased from the Grid (kWh)")
 plt.legend()
 plt.tight_layout()
 plt.savefig(PLOTS_DIR / "04_grid_purchased.png")
@@ -87,20 +87,20 @@ def plot_strategy_evolution(df, agent_prefix, title, filename):
     
     # Calcular % de uso por episodio (total de pasos = n_steps - 1)
     # Asumimos n_steps fijo para normalizar, o directamente graficamos recuentos
-    plt.plot(df["episode"], df[f"{agent_prefix}_honest"].rolling(WINDOW).mean(), label="Honesto", color="green")
-    plt.plot(df["episode"], df[f"{agent_prefix}_hide"].rolling(WINDOW).mean(), label="Ocultación (Premium)", color="orange")
-    plt.plot(df["episode"], df[f"{agent_prefix}_deception"].rolling(WINDOW).mean(), label="Engaño (Dumping)", color="red")
+    plt.plot(df["episode"], df[f"{agent_prefix}_honest"].rolling(WINDOW).mean(), label="Honest", color="green")
+    plt.plot(df["episode"], df[f"{agent_prefix}_hide"].rolling(WINDOW).mean(), label="Hiding (Premium)", color="orange")
+    plt.plot(df["episode"], df[f"{agent_prefix}_deception"].rolling(WINDOW).mean(), label="Deception (Dumping)", color="red")
     
-    plt.title(f"{title} - Evolución de Tácticas", fontweight='bold')
-    plt.xlabel("Episodio")
-    plt.ylabel("Frecuencia de Uso (suavizada)")
+    plt.title(f"{title} - Tactic Evolution", fontweight='bold')
+    plt.xlabel("Episode")
+    plt.ylabel("Usage Frequency (smoothed)")
     plt.legend()
     plt.tight_layout()
     plt.savefig(PLOTS_DIR / filename)
     plt.close()
 
-plot_strategy_evolution(negotiation_df, "solar", "Agente Solar (Modo Negociación)", "05_strategies_solar.png")
-plot_strategy_evolution(negotiation_df, "wind", "Agente Eólico (Modo Negociación)", "06_strategies_wind.png")
+plot_strategy_evolution(negotiation_df, "solar", "Solar Agent (Negotiation Mode)", "05_strategies_solar.png")
+plot_strategy_evolution(negotiation_df, "wind", "Eolic Agent (Negotiation Mode)", "06_strategies_wind.png")
 
 # ==================================================
 # 4. HEATMAPS ADAPTATIVOS
@@ -122,22 +122,22 @@ def save_heatmap(qtable, title, filename):
     sns.heatmap(heatmap, annot=True, fmt=".1f", cmap="YlGnBu", cbar_kws={'label': 'Max Q-Value'})
     
     plt.title(title, fontweight='bold')
-    plt.xticks(ticks=[0.5, 1.5, 2.5], labels=["Bajo", "Medio", "Alto"])
-    plt.yticks(ticks=[0.5, 1.5, 2.5], labels=["Baja", "Media", "Alta"])
-    plt.xlabel("Precio de Red")
-    plt.ylabel("Demanda Restaurante")
+    plt.xticks(ticks=[0.5, 1.5, 2.5], labels=["Low", "Medium", "High"])
+    plt.yticks(ticks=[0.5, 1.5, 2.5], labels=["Low", "Medium", "High"])
+    plt.xlabel("Grid Price")
+    plt.ylabel("Restaurant Demand")
     
     plt.tight_layout()
     plt.savefig(PLOTS_DIR / filename)
     plt.close()
 
-save_heatmap(comp_solar_q, "Max Q-Value Solar (Competitivo)", "07_heatmap_solar_comp.png")
-save_heatmap(coop_solar_q, "Max Q-Value Solar (Cooperativo)", "08_heatmap_solar_coop.png")
-save_heatmap(nego_solar_q, "Max Q-Value Solar (Negociación)", "09_heatmap_solar_nego.png")
+save_heatmap(comp_solar_q, "Max Q-Value Solar (Competitive)", "07_heatmap_solar_comp.png")
+save_heatmap(coop_solar_q, "Max Q-Value Solar (Cooperative)", "08_heatmap_solar_coop.png")
+save_heatmap(nego_solar_q, "Max Q-Value Solar (Negotiation)", "09_heatmap_solar_nego.png")
 
-save_heatmap(comp_wind_q, "Max Q-Value Wind (Competitivo)", "10_heatmap_wind_comp.png")
-save_heatmap(coop_wind_q, "Max Q-Value Wind (Cooperativo)", "11_heatmap_wind_coop.png")
-save_heatmap(nego_wind_q, "Max Q-Value Wind (Negociación)", "12_heatmap_wind_nego.png")
+save_heatmap(comp_wind_q, "Max Q-Value Wind (Competitive)", "10_heatmap_wind_comp.png")
+save_heatmap(coop_wind_q, "Max Q-Value Wind (Cooperative)", "11_heatmap_wind_coop.png")
+save_heatmap(nego_wind_q, "Max Q-Value Wind (Negotiation)", "12_heatmap_wind_nego.png")
 
 print("\n" + "=" * 60)
 print("GRÁFICAS GENERADAS CON ÉXITO")

@@ -28,12 +28,12 @@ PRICE_CSV = BASE_DIR / "data" / "raw" / "Precios" / "precio2025-peninsula.csv"
 
 # Cargar Q-Tables ya entrenadas (ejemplo: Competitivo)
 # IMPORTANTE: Asegúrate de tener los .npy generados tras los 5000 episodios
-QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "cooperative_battery_solar_qtable.npy"
-QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "cooperative_battery_wind_qtable.npy"
+QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_solar_qtable.npy"
+QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_wind_qtable.npy"
 
 #RUTA DE GUARDADO
-SAVE_PATH_IMG= BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_coop.png"
-SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_coop.csv"
+SAVE_PATH_IMG= BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_comp.png"
+SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_comp.csv"
 
 # ==================================================
 # CARGA DE DATOS HORARIOS
@@ -181,26 +181,26 @@ df_week = df_history.iloc[start_h:end_h]
 fig, ax1 = plt.subplots(figsize=(12, 6))
 
 # Eje Y Izquierdo: Potencia (kW)
-ax1.plot(df_week["hour"], df_week["demand"], label="Demanda Real", color="black", linestyle="--")
-ax1.plot(df_week["hour"], df_week["effective_demand"], label="Demanda Efectiva (Tras Batería)", color="red")
+ax1.plot(df_week["hour"], df_week["demand"], label="Real Demand", color="black", linestyle="--")
+ax1.plot(df_week["hour"], df_week["effective_demand"], label="Effective Demand (After Battery)", color="red")
 ax1.fill_between(df_week["hour"], 0, df_week["solar_prod"], alpha=0.3, color="orange", label="Solar")
-ax1.fill_between(df_week["hour"], df_week["solar_prod"], df_week["solar_prod"] + df_week["wind_prod"], alpha=0.3, color="blue", label="Eólica")
+ax1.fill_between(df_week["hour"], df_week["solar_prod"], df_week["solar_prod"] + df_week["wind_prod"], alpha=0.3, color="blue", label="Eolic")
 
-ax1.set_xlabel("Horas del Año")
-ax1.set_ylabel("Potencia (kW)")
+ax1.set_xlabel("Hours of the Year")
+ax1.set_ylabel("Power (kW)")
 ax1.legend(loc="upper left")
 
 # Eje Y Derecho: SoC de la Batería
 ax2 = ax1.twinx()
 ax2.plot(df_week["hour"], df_week["battery_soc"] * 100, label="SoC Batería (%)", color="green", linewidth=2)
-ax2.set_ylabel("Estado de Carga (%)", color="green")
+ax2.set_ylabel("State of Charge (%)", color="green")
 ax2.set_ylim(0, 105)
 ax2.legend(loc="upper right")
 
 # Asegurar que el directorio de la imagen exista antes de guardar
 SAVE_PATH_IMG.parent.mkdir(parents=True, exist_ok=True)
 
-plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana) - Cooperativo")
+plt.title("Battery Physical Dynamics and Renewable Production (1 Week) – Competitive")
 plt.tight_layout()
 plt.savefig(str(SAVE_PATH_IMG), dpi=300, bbox_inches="tight")
 
