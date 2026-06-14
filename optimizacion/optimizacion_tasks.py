@@ -228,7 +228,7 @@ def _plot_demand_battery(front_data: list[dict], T: int, DEMAND: np.ndarray,
     idx_low_deficit= idx_sorted[-1]
     idx_mid        = idx_sorted[len(idx_sorted) // 2]
 
-    labels = ["Min coste", "Punto medio", "Min deficit"]
+    labels = ["Min Cost", "Middle Point", "Min Grid Intake"]
     idxs   = [idx_low_cost, idx_mid, idx_low_deficit]
     colors = ["steelblue", "darkorange", "seagreen"]
     horas  = np.arange(T)
@@ -250,21 +250,21 @@ def _plot_demand_battery(front_data: list[dict], T: int, DEMAND: np.ndarray,
         deficit = np.maximum(0, DEMAND - supply)
 
         ax = axes[row, 0]
-        ax.plot(horas, DEMAND,  color="black",     lw=2.0, label="Demanda")
-        ax.plot(horas, x1 + x2, color="goldenrod", lw=1.5, label="Solar+eolico")
-        ax.plot(horas, supply,  color="purple",    lw=2.0, label="Suministro neto")
+        ax.plot(horas, DEMAND,  color="black",     lw=2.0, label="Demand")
+        ax.plot(horas, x1 + x2, color="goldenrod", lw=1.5, label="Solar+Wind")
+        ax.plot(horas, supply,  color="purple",    lw=2.0, label="Net Supply")
         ax.fill_between(horas, supply, DEMAND, where=supply < DEMAND,
                         color="red", alpha=0.2, label="Deficit")
-        ax.set_title(f"{label}: demanda y cobertura"); ax.set_ylabel("kWh/h")
+        ax.set_title(f"{label}: demand and coverage"); ax.set_ylabel("kWh/h")
         ax.legend(fontsize=8)
 
         ax = axes[row, 1]
         ax.bar(horas, x1,                                   color="gold",      alpha=0.85, label="Solar",            width=1.0)
-        ax.bar(horas, x2,              bottom=x1,           color="skyblue",   alpha=0.85, label="Eolico",           width=1.0)
-        ax.bar(horas, battery_discharge, bottom=x1 + x2,   color="limegreen", alpha=0.85, label="Bateria descarga", width=1.0)
-        ax.bar(horas, -battery_charge,                      color="tomato",    alpha=0.6,  label="Bateria carga",    width=1.0)
+        ax.bar(horas, x2,              bottom=x1,           color="skyblue",   alpha=0.85, label="Wind",           width=1.0)
+        ax.bar(horas, battery_discharge, bottom=x1 + x2,   color="limegreen", alpha=0.85, label="Battery discharge", width=1.0)
+        ax.bar(horas, -battery_charge,                      color="tomato",    alpha=0.6,  label="Battery charge",    width=1.0)
         ax.axhline(0, color="k", lw=0.8)
-        ax.set_title(f"{label}: desglose horario"); ax.set_ylabel("kWh/h")
+        ax.set_title(f"{label}: hourly breakdown"); ax.set_ylabel("kWh/h")
         ax.legend(fontsize=8, ncol=2)
 
         ax = axes[row, 2]
@@ -272,12 +272,12 @@ def _plot_demand_battery(front_data: list[dict], T: int, DEMAND: np.ndarray,
         ax.axhline(bat_soc_min_kwh, color="gray", ls=":", lw=1.0, label="SOC min/max")
         ax.axhline(bat_soc_max_kwh, color="gray", ls=":", lw=1.0)
         ax.set_ylim(0, bat_cap * 1.05)
-        ax.set_title(f"{label}: estado de carga"); ax.set_ylabel("kWh")
+        ax.set_title(f"{label}: State of Charge"); ax.set_ylabel("kWh")
         ax.legend(fontsize=8)
 
     for ax in axes[-1, :]:
-        ax.set_xlabel("Hora")
-    plt.suptitle(f"Cobertura de la demanda y uso de la bateria — {algo_name}",
+        ax.set_xlabel("Hour")
+    plt.suptitle(f"Demand Coverage and Battery Management — {algo_name}",
                  fontsize=14, fontweight="bold")
     plt.tight_layout()
     plt.savefig(str(out_path), dpi=150, bbox_inches="tight")
@@ -372,39 +372,39 @@ def tarea_setup_datos(
     horas = np.arange(T)
     ax0 = fig.add_subplot(gs[0, :])
     ax0.fill_between(horas, P_SOLAR + P_WIND, DEMAND,
-                     where=(P_SOLAR+P_WIND) >= DEMAND, alpha=0.3, color="green", label="Superavit")
+                     where=(P_SOLAR+P_WIND) >= DEMAND, alpha=0.3, color="green", label="Surplus")
     ax0.fill_between(horas, P_SOLAR + P_WIND, DEMAND,
                      where=(P_SOLAR+P_WIND) < DEMAND,  alpha=0.3, color="red",   label="Deficit")
-    ax0.plot(horas, P_SOLAR + P_WIND, label="Renovables (solar+eolico)", lw=1.2)
-    ax0.plot(horas, DEMAND, label="Demanda", lw=1.2, color="k")
+    ax0.plot(horas, P_SOLAR + P_WIND, label="Renewables (Solar+Wind)", lw=1.2)
+    ax0.plot(horas, DEMAND, label="Demand", lw=1.2, color="k")
     ax0.axhline(dem_media, ls="--", color="gray", lw=0.8,
-                label=f"Demanda media ({dem_media:.1f} kWh/h)")
+                label=f"Average Demand ({dem_media:.1f} kWh/h)")
     ax0.set_title(
-        f"Produccion renovable vs demanda  |  ratio dem/prod = {ratio_dem:.1%}"
-        f"  |  superavit: {horas_superavit:.0f}%  |  deficit: {horas_deficit:.0f}%"
+        f"Renewable production vs demand  |  Demand/Prod Ratio = {ratio_dem:.1%}"
+        f"  |  Surplus: {horas_superavit:.0f}%  |  Deficit: {horas_deficit:.0f}%"
     )
-    ax0.set_xlabel("Hora"); ax0.set_ylabel("kWh/h"); ax0.legend(fontsize=8)
+    ax0.set_xlabel("Hour"); ax0.set_ylabel("kWh/h"); ax0.legend(fontsize=8)
 
     ax1 = fig.add_subplot(gs[1, 0])
     ax1.hist(A_SOLAR * 1000, bins=30, alpha=0.6, label="Solar (€/MWh)")
-    ax1.hist(A_WIND  * 1000, bins=30, alpha=0.6, label="Eolico (€/MWh)")
-    ax1.hist(A_GRID  * 1000, bins=30, alpha=0.6, label="Red (€/MWh)")
-    ax1.set_title(f"Distribucion precios  |  red/solar={ratio_grid_solar:.2f}x  |  red/eolico={ratio_grid_wind:.2f}x")
+    ax1.hist(A_WIND  * 1000, bins=30, alpha=0.6, label="Wind (€/MWh)")
+    ax1.hist(A_GRID  * 1000, bins=30, alpha=0.6, label="Grid (€/MWh)")
+    ax1.set_title(f"Price Distribution  |  Grid/Solar={ratio_grid_solar:.2f}x  |  Grid/Wind={ratio_grid_wind:.2f}x")
     ax1.set_xlabel("€/MWh"); ax1.legend(fontsize=8)
 
     ax2 = fig.add_subplot(gs[1, 1])
-    ax2.bar(["Superavit", "Deficit"], [horas_superavit, horas_deficit],
+    ax2.bar(["Surplus", "Deficit"], [horas_superavit, horas_deficit],
             color=["green", "red"], alpha=0.7)
-    ax2.set_ylabel("% horas"); ax2.set_title("Distribucion superavit / deficit")
+    ax2.set_ylabel("% hours"); ax2.set_title("Surplus / Deficit Distribution")
     ax2.set_ylim(0, 100)
     for bar, val in zip(ax2.patches, [horas_superavit, horas_deficit]):
         ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
                  f"{val:.1f}%", ha="center", va="bottom", fontsize=10)
-    plt.suptitle("Analisis exploratorio de los datos", fontsize=13, fontweight="bold")
+    plt.suptitle("Exploratory Analysis of the Data", fontsize=13, fontweight="bold")
     plt.tight_layout()
     plt.savefig(str(plots_dir / "exploratorio_datos.png"), dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"Plot guardado: {plots_dir / 'exploratorio_datos.png'}")
+    print(f"Plot saved: {plots_dir / 'exploratorio_datos.png'}")
 
     return {
         "DEMAND":  DEMAND.tolist(),
@@ -489,8 +489,8 @@ def tarea_run_nsgaii(
     plots_dir.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.scatter(front_arr[:, 0], front_arr[:, 1], c="C0", edgecolors="k", s=30)
-    ax.set_title(f"Frente de Pareto — {algo_name}")
-    ax.set_xlabel("Coste (€)"); ax.set_ylabel("Energia de red (kWh)")
+    ax.set_title(f"Pareto Front — {algo_name}")
+    ax.set_xlabel("Economic Cost (€)"); ax.set_ylabel("Grid Energy Consumption (kWh)")
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
     plt.savefig(str(plots_dir / "pareto_nsgaii.png"), dpi=150, bbox_inches="tight")
@@ -578,8 +578,8 @@ def tarea_run_spea2(
     plots_dir.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.scatter(front_arr[:, 0], front_arr[:, 1], c="C1", edgecolors="k", s=30)
-    ax.set_title(f"Frente de Pareto — {algo_name}")
-    ax.set_xlabel("Coste (€)"); ax.set_ylabel("Energia de red (kWh)")
+    ax.set_title(f"Pareto Front — {algo_name}")
+    ax.set_xlabel("Economic Cost (€)"); ax.set_ylabel("Grid Energy Consumption (kWh)")
     ax.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout()
     plt.savefig(str(plots_dir / "pareto_spea2.png"), dpi=150, bbox_inches="tight")
@@ -677,7 +677,7 @@ def tarea_analizar_resultados(
 
     # ---- Seccion 10: sensibilidad HV vs hiperparametros ----
     hp_params = ["eta_c", "eta_m", "crossover_prob"]
-    hp_labels = ["eta_c (SBX)", "eta_m (PM)", "Prob. cruce"]
+    hp_labels = ["eta_c (SBX)", "eta_m (PM)", "Crossover Probability"]
     algorithms = list(df["algorithm"].unique())
     colors_map = {"NSGAII": "#1f77b4", "SPEA2": "#ff7f0e"}
 
@@ -692,9 +692,9 @@ def tarea_analizar_resultados(
             ax.scatter(da[p], da["hv_norm"], color=colors_map.get(algo, "gray"), alpha=0.7, s=35)
             ax.set_xlabel(lbl); ax.set_title(algo)
             if col == 0:
-                ax.set_ylabel("HV normalizado")
+                ax.set_ylabel("Normalized HV")
             ax.grid(alpha=0.3)
-    plt.suptitle("Influencia de cada hiperparametro sobre el HV normalizado",
+    plt.suptitle("Hyperparameter Influence on Normalized Hypervolume (HV)",
                  y=1.02, fontsize=13)
     plt.tight_layout()
     plt.savefig(str(plots_dir / "sensibilidad_hv.png"), dpi=150, bbox_inches="tight")
@@ -706,8 +706,8 @@ def tarea_analizar_resultados(
         da = df[df["algorithm"] == algo].sort_values("elapsed_mean_s")
         ax.scatter(da["elapsed_mean_s"], da["hv_norm"],
                    label=algo, color=colors_map.get(algo, "gray"), alpha=0.7, s=35)
-    ax.set_xlabel("Tiempo medio por run (s)"); ax.set_ylabel("HV normalizado")
-    ax.set_title("Calidad del frente vs coste computacional")
+    ax.set_xlabel("Mean Time per Run (s)"); ax.set_ylabel("Normalized HV")
+    ax.set_title("Front Quality vs Computational Cost")
     ax.legend(); ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(str(plots_dir / "hv_vs_tiempo.png"), dpi=150, bbox_inches="tight")
@@ -723,9 +723,9 @@ def tarea_analizar_resultados(
         ax.plot([f1[i] for i in order], [f2[i] for i in order],
                 marker=markers.get(algo_name, "o"), linestyle="-",
                 color=colors_map.get(algo_name, "gray"), label=algo_name, alpha=0.8)
-    ax.set_xlabel("f1 — Coste total (€)", fontsize=14)
-    ax.set_ylabel("f2 — Energia de red (kWh)", fontsize=14)
-    ax.set_title(f"Frentes de Pareto (ventana de {T} h)", fontsize=14)
+    ax.set_xlabel("f1 — Economic Cost (€)", fontsize=14)
+    ax.set_ylabel("f2 — Grid Energy Consumption (kWh)", fontsize=14)
+    ax.set_title(f"Pareto Fronts ({T}-hour Horizon)", fontsize=14)
     ax.legend(); ax.grid(alpha=0.3)
     plt.tight_layout()
     plt.savefig(str(plots_dir / "pareto_comparativo.png"), dpi=150, bbox_inches="tight")
