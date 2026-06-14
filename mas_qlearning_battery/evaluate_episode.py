@@ -28,12 +28,12 @@ PRICE_CSV = BASE_DIR / "data" / "raw" / "Precios" / "precio2025-peninsula.csv"
 
 # Cargar Q-Tables ya entrenadas (ejemplo: Competitivo)
 # IMPORTANTE: Asegúrate de tener los .npy generados tras los 5000 episodios
-QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_solar_qtable.npy"
-QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_wind_qtable.npy"
+QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "cooperative_battery_solar_qtable.npy"
+QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "cooperative_battery_wind_qtable.npy"
 
 #RUTA DE GUARDADO
-SAVE_PATH_IMG= BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_comp.png"
-SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_comp.csv"
+SAVE_PATH_IMG= BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_coop.png"
+SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_coop.csv"
 
 # ==================================================
 # CARGA DE DATOS HORARIOS
@@ -200,7 +200,7 @@ ax2.legend(loc="upper right")
 # Asegurar que el directorio de la imagen exista antes de guardar
 SAVE_PATH_IMG.parent.mkdir(parents=True, exist_ok=True)
 
-plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana) - Competitivo")
+plt.title("Dinámica Física de la Batería y Producción Renovable (1 Semana) - Cooperativo")
 plt.tight_layout()
 plt.savefig(str(SAVE_PATH_IMG), dpi=300, bbox_inches="tight")
 
