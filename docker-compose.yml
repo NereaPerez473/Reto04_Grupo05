@@ -15,11 +15,11 @@ services:
     volumes:
       - prefect_data:/root/.prefect
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
       interval: 15s
       timeout: 5s
-      retries: 8
-      start_period: 20s
+      retries: 10
+      start_period: 30s
 
   # ------------------------------------------------------------------ #
   # 2. Worker del pipeline — ETL → Inferencia → Precios → Optimización  #
