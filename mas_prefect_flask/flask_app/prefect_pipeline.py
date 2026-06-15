@@ -5,6 +5,7 @@ from sma_evaluator import run_evaluation
 
 from pathlib import Path
 import pandas as pd
+import time
 
 
 # ==================================================
@@ -14,12 +15,18 @@ import pandas as pd
 @task(name="Load Data")
 def load_data():
 
-    return {
+    t0 = time.perf_counter()
+
+    result = {
         "solar": True,
         "wind": True,
         "load": True,
         "price": True
     }
+
+    elapsed = round(time.perf_counter() - t0, 4)
+
+    return result, elapsed
 
 
 # ==================================================
@@ -29,9 +36,15 @@ def load_data():
 @task(name="Load Q-Tables")
 def load_qtables(mode):
 
-    return {
+    t0 = time.perf_counter()
+
+    result = {
         "mode": mode
     }
+
+    elapsed = round(time.perf_counter() - t0, 4)
+
+    return result, elapsed
 
 
 # ==================================================
@@ -41,7 +54,13 @@ def load_qtables(mode):
 @task(name="Simulate Episode")
 def simulate_episode(mode):
 
-    return run_evaluation(mode)
+    t0 = time.perf_counter()
+
+    result = run_evaluation(mode)
+
+    elapsed = round(time.perf_counter() - t0, 4)
+
+    return result, elapsed
 
 
 # ==================================================
@@ -51,7 +70,9 @@ def simulate_episode(mode):
 @task(name="Generate Metrics")
 def generate_metrics(result):
 
-    return {
+    t0 = time.perf_counter()
+
+    metrics = {
 
         "grid_energy": result["grid_energy"],
         "battery_soc": result["battery_soc"],
@@ -68,6 +89,10 @@ def generate_metrics(result):
         "mode": result["mode"]
     }
 
+    elapsed = round(time.perf_counter() - t0, 4)
+
+    return metrics, elapsed
+
 
 # ==================================================
 # TASK 5
@@ -75,6 +100,8 @@ def generate_metrics(result):
 
 @task(name="Save Results")
 def save_results(metrics):
+
+    t0 = time.perf_counter()
 
     output_dir = Path("/project/results")
 
@@ -90,7 +117,9 @@ def save_results(metrics):
         index=False
     )
 
-    return True
+    elapsed = round(time.perf_counter() - t0, 4)
+
+    return True, elapsed
 
 
 # ==================================================
@@ -104,18 +133,36 @@ def evaluate_flow(
     mode="competitive"
 ):
 
-    load_data()
+    flow_start = time.perf_counter()
 
-    load_qtables(mode)
+    _, t_load_data = load_data()
 
-    simulation_result = simulate_episode(mode)
+    _, t_load_qtables = load_qtables(mode)
 
-    metrics = generate_metrics(
+    simulation_result, t_simulate = simulate_episode(mode)
+
+    metrics, t_metrics = generate_metrics(
         simulation_result
     )
 
-    save_results(
+    _, t_save = save_results(
         metrics
     )
+
+    total_elapsed = round(
+        time.perf_counter() - flow_start, 4
+    )
+
+    # Tiempos de cada tarea del flow
+    task_times = {
+        "Load Data": t_load_data,
+        "Load Q-Tables": t_load_qtables,
+        "Simulate Episode": t_simulate,
+        "Generate Metrics": t_metrics,
+        "Save Results": t_save,
+        "Total Flow": total_elapsed
+    }
+
+    metrics["task_times"] = task_times
 
     return metrics
