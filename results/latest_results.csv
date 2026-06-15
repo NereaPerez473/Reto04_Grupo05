@@ -1,2 +1,2 @@
 grid_energy,battery_soc,renewable_energy,renewable_share,consumer_cost,solar_revenue,wind_revenue,solar_strategy,wind_strategy,mode
-152560.49,17.51,423240.59,73.5,74763.0,28414.05,21950.2,honest,honest,competitive
+152560.49,17.51,423240.59,73.5,75272.95,28015.21,22859.0,honest,honest,negotiation
