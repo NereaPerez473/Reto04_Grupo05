@@ -75,8 +75,6 @@ def tarea_feature_engineering_solar(ruta_entrada: str, ruta_salida: str) -> str:
 # ---------------------------------------------------------
 # BLOQUE DE PRUEBA LOCAL
 # ---------------------------------------------------------
-# Si ejecutas este archivo directamente (python src/etl.py), 
-# Prefect ejecutará las tareas sin necesidad de un flujo complejo.
 if __name__ == "__main__":
     from prefect import flow
     import os
