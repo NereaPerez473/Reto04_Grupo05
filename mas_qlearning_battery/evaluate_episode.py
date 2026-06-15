@@ -14,8 +14,17 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from simple_battery import SimpleBattery
-from strategy_qlearning_battery import StrategyQLearning 
 from strategies import NegotiationStrategies 
+
+# Importamos ambas versiones de la estrategia
+from strategy_qlearning_battery import StrategyQLearning as AgentCompCoop
+from strategy_qlearning_negotiation_battery import StrategyQLearning as AgentNego
+
+# ==================================================
+# SELECCIÓN DE MODO
+# ==================================================
+# Opciones válidas: "competitive", "cooperative", "negotiation"
+MODE = "negotiation"
 
 # ==================================================
 # RUTAS Y DATOS 
@@ -26,13 +35,13 @@ WIND_CSV  = BASE_DIR / "data" / "results" / "Predicciones_Eolico.csv"
 LOAD_CSV  = BASE_DIR / "data" / "raw" / "demanda_restaurante.csv"
 PRICE_CSV = BASE_DIR / "data" / "raw" / "Precios" / "precio2025-peninsula.csv"
 
-# Cargar Q-Tables ya entrenadas
-QTABLE_SOLAR = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_solar_qtable.npy"
-QTABLE_WIND  = BASE_DIR / "mas_qlearning_battery" / "results" / "competitive_battery_wind_qtable.npy"
+# Construcción dinámica de rutas según el MODO seleccionado
+RESULTS_DIR = BASE_DIR / "mas_qlearning_battery" / "results"
+QTABLE_SOLAR = RESULTS_DIR / f"{MODE}_battery_solar_qtable.npy"
+QTABLE_WIND  = RESULTS_DIR / f"{MODE}_battery_wind_qtable.npy"
 
-#RUTA DE GUARDADO
-SAVE_PATH_IMG= BASE_DIR / "mas_qlearning_battery" / "results" / "plots" / "evaluate_episode_plot_comp.png"
-SAVE_PATH_CSV= BASE_DIR / "mas_qlearning_battery" / "results" / "evaluate_episode_comp.csv"
+SAVE_PATH_IMG = RESULTS_DIR / "plots" / f"evaluate_episode_plot_{MODE}.png"
+SAVE_PATH_CSV = RESULTS_DIR / f"evaluate_episode_{MODE}.csv"
 
 # ==================================================
 # CARGA DE DATOS HORARIOS
@@ -48,12 +57,22 @@ solar, wind, load, price = solar[:n_steps], wind[:n_steps], load[:n_steps], pric
 # ==================================================
 # INICIALIZACIÓN PARA EVALUACIÓN
 # ==================================================
-# Epsilon = 0 (No explora, usa el 100% de lo aprendido)
-solar_agent = StrategyQLearning(epsilon=0.0)
-wind_agent  = StrategyQLearning(epsilon=0.0)
+# Instanciamos el agente correcto según el modo
+if MODE == "negotiation":
+    solar_agent = AgentNego(epsilon=0.0)
+    wind_agent  = AgentNego(epsilon=0.0)
+else:
+    solar_agent = AgentCompCoop(epsilon=0.0)
+    wind_agent  = AgentCompCoop(epsilon=0.0)
 
-solar_agent.q_table = np.load(QTABLE_SOLAR)
-wind_agent.q_table  = np.load(QTABLE_WIND)
+# Cargar Q-Tables ya entrenadas
+try:
+    solar_agent.q_table = np.load(QTABLE_SOLAR)
+    wind_agent.q_table  = np.load(QTABLE_WIND)
+    print(f"Cargadas con éxito las Q-Tables para el modo: {MODE.upper()}")
+except FileNotFoundError:
+    print(f"Error: No se encuentran las Q-Tables para {MODE}. Ejecuta primero el entrenamiento.")
+    exit()
 
 battery = SimpleBattery(capacity_kwh=200.0)
 
@@ -86,14 +105,13 @@ for t in range(n_steps - 1):
     eff_d = d - battery_contribution
     
     # ==========================================
-    # 2. ESTADOS Y ACCIONES (Automático 3D/4D)
+    # 2. ESTADOS Y ACCIONES
     # ==========================================
-    if solar_agent.q_table.ndim == 5:
-        # Modelo Negociación
+    # Diferenciamos la firma de get_state() según el MODO
+    if MODE == "negotiation":
         s_state = solar_agent.get_state(eff_d, p, s, battery.soc)
         w_state = wind_agent.get_state(eff_d, p, w, battery.soc)
     else:
-        # Modelo Competitivo / Cooperativo
         s_state = solar_agent.get_state(eff_d, p, battery.soc)
         w_state = wind_agent.get_state(eff_d, p, battery.soc)
     
@@ -199,7 +217,7 @@ ax2.legend(loc="upper right")
 # Asegurar que el directorio de la imagen exista antes de guardar
 SAVE_PATH_IMG.parent.mkdir(parents=True, exist_ok=True)
 
-plt.title("Battery Physical Dynamics and Renewable Production (1 Week) – Competitive")
+plt.title(f"Battery Physical Dynamics and Renewable Production (1 Week) – {MODE.capitalize()}")
 plt.tight_layout()
 plt.savefig(str(SAVE_PATH_IMG), dpi=300, bbox_inches="tight")
 
@@ -207,3 +225,4 @@ plt.show()
 
 # Guardar el CSV paso a paso
 df_history.to_csv(str(SAVE_PATH_CSV), index=False)
+print(f"Evaluación completada. CSV guardado en: {SAVE_PATH_CSV}")
