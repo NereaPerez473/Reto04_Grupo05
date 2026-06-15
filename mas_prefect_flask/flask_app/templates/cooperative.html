@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}
+Cooperative Mode
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <h1 class="page-title">
+
+        Cooperative Mode Analysis
+
+    </h1>
+
+    <div class="alert alert-success">
+
+        Cooperative reinforcement learning scenario.
+
+    </div>
+
+    <!-- HEATMAPS -->
+
+    <div class="row">
+
+        <div class="col-lg-6 mb-4">
+
+            <div class="card graph-card">
+
+                <div class="card-header">
+
+                    <h4>
+
+                        Solar Agent Heatmap
+
+                    </h4>
+
+                </div>
+
+                <div class="card-body">
+
+                    <img
+                        src="/plot/08_heatmap_solar_coop.png"
+                        class="img-fluid">
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-6 mb-4">
+
+            <div class="card graph-card">
+
+                <div class="card-header">
+
+                    <h4>
+
+                        Wind Agent Heatmap
+
+                    </h4>
+
+                </div>
+
+                <div class="card-body">
+
+                    <img
+                        src="/plot/11_heatmap_wind_coop.png"
+                        class="img-fluid">
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- GRID PURCHASED -->
+
+    <div class="row">
+
+        <div class="col">
+
+            <div class="card graph-card">
+
+                <div class="card-header">
+
+                    <h4>
+
+                        Grid Dependency Evolution
+
+                    </h4>
+
+                </div>
+
+                <div class="card-body">
+
+                    <img
+                        src="/plot/04_grid_purchased.png"
+                        class="img-fluid">
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- INTERPRETACIÓN -->
+
+    <div class="row mt-4">
+
+        <div class="col">
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <h4>
+
+                        Interpretation
+
+                    </h4>
+
+                </div>
+
+                <div class="card-body">
+
+                    <p>
+
+                        In the cooperative scenario both agents
+                        pursue a common objective and attempt
+                        to improve the overall performance
+                        of the microgrid.
+
+                    </p>
+
+                    <p>
+
+                        The learned policies tend to reduce
+                        unnecessary competition and improve
+                        renewable energy utilisation.
+
+                    </p>
+
+                    <p>
+
+                        Lower dependence on the external
+                        electricity grid indicates a more
+                        efficient use of renewable resources.
+
+                    </p>
+
+                    <p>
+
+                        The heatmaps represent the most
+                        valuable actions learned by each
+                        producer under different operating
+                        conditions.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

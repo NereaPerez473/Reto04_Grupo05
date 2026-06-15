@@ -1,0 +1,817 @@
+{% extends "base.html" %}
+
+{% block title %}
+Negotiation Mode
+{% endblock %}
+
+{% block content %}
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<div class="container-fluid">
+
+    <h1 class="page-title">Negotiation Mode Analysis</h1>
+
+    <div class="alert alert-danger">
+        Strategic behaviour learned through Q-Learning — live simulation panel.
+    </div>
+
+    <!-- ================================================== -->
+    <!-- PANEL DE CONTROL                                   -->
+    <!-- ================================================== -->
+
+    <div class="card mb-4 border-danger">
+
+        <div class="card-header bg-danger text-white">
+            <h4 class="mb-0">⚡ Live Simulation Control</h4>
+        </div>
+
+        <div class="card-body">
+
+            <div class="row g-3 align-items-end">
+
+                <!-- Selector de modo -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Agent Mode</label>
+                    <select id="sel-mode" class="form-select">
+                        <option value="negotiation" selected>Negotiation</option>
+                        <option value="competitive">Competitive</option>
+                        <option value="cooperative">Cooperative</option>
+                    </select>
+                </div>
+
+                <!-- Número de episodios -->
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        Episodes: <span id="ep-label">1</span>
+                    </label>
+                    <input
+                        id="ep-slider"
+                        type="range"
+                        class="form-range"
+                        min="1" max="20" step="1" value="1"
+                        oninput="document.getElementById('ep-label').textContent = this.value">
+                </div>
+
+                <!-- Botones -->
+                <div class="col-md-5 d-flex gap-2">
+                    <button
+                        id="btn-run"
+                        class="btn btn-danger fw-bold flex-grow-1"
+                        onclick="startStream()">
+                        ▶ Run Simulation
+                    </button>
+                    <button
+                        class="btn btn-outline-secondary"
+                        onclick="resetPanel()">
+                        ↺ Reset
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Progreso global (episodios) -->
+            <div class="mt-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <small class="text-muted" id="ep-progress-label">Episodes: 0 / 0</small>
+                    <small class="text-muted" id="step-progress-label">Step: 0 %</small>
+                </div>
+                <div class="progress mb-1" style="height:8px">
+                    <div id="ep-bar"
+                         class="progress-bar bg-dark"
+                         style="width:0"></div>
+                </div>
+                <div class="progress" style="height:6px">
+                    <div id="step-bar"
+                         class="progress-bar progress-bar-striped progress-bar-animated bg-danger"
+                         style="width:0"></div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ================================================== -->
+    <!-- KPIs EN VIVO                                       -->
+    <!-- ================================================== -->
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-6 col-lg-2">
+            <div class="card text-center border-0 bg-light h-100">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Episode</small>
+                    <strong id="kpi-episode">—</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card text-center border-0 bg-light h-100">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Battery SoC</small>
+                    <strong id="kpi-soc">—</strong> <small>%</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card text-center border-0 bg-light h-100">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Grid Energy</small>
+                    <strong id="kpi-grid">—</strong> <small>kWh</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card text-center border-0 bg-light h-100">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Renewable</small>
+                    <strong id="kpi-renew">—</strong> <small>kWh</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card text-center border-0 bg-light h-100">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Consumer Cost</small>
+                    <strong id="kpi-cost">—</strong> <small>€</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-2">
+            <div class="card text-center border-0 bg-light h-100">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Elapsed</small>
+                    <strong id="kpi-elapsed">—</strong> <small>s</small>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================== -->
+    <!-- GRÁFICAS EN VIVO                                   -->
+    <!-- ================================================== -->
+
+    <div class="row g-4 mb-4">
+
+        <!-- SoC batería -->
+        <div class="col-lg-6">
+            <div class="card graph-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">🔋 Battery SoC — live</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-soc" height="180"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid vs Renewable acumulado -->
+        <div class="col-lg-6">
+            <div class="card graph-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">⚡ Grid vs Renewable — accumulated</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-energy" height="180"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="row g-4 mb-4">
+
+        <!-- Distribución estrategias solar -->
+        <div class="col-lg-4">
+            <div class="card graph-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">☀ Solar Strategy Distribution</h5>
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <canvas id="chart-solar-strat" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distribución estrategias eólico -->
+        <div class="col-lg-4">
+            <div class="card graph-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">💨 Wind Strategy Distribution</h5>
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <canvas id="chart-wind-strat" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Renewable share por episodio -->
+        <div class="col-lg-4">
+            <div class="card graph-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">🌿 Renewable Share per Episode</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart-share" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================== -->
+    <!-- AGENTES EN TIEMPO REAL + LOG                       -->
+    <!-- ================================================== -->
+
+    <div class="row g-4 mb-4">
+
+        <!-- Solar agent -->
+        <div class="col-md-6">
+            <div class="card border-warning h-100">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <strong>☀ Solar Agent</strong>
+                    <span id="live-solar-badge" class="badge bg-secondary fs-6">—</span>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Energy offered</span>
+                        <strong><span id="live-solar-energy">—</span> kW</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">Price offered</span>
+                        <strong><span id="live-solar-price">—</span> €/kWh</strong>
+                    </div>
+                    <small class="text-muted">Last 15 strategies</small>
+                    <div id="solar-log" class="d-flex flex-wrap gap-1 mt-1" style="min-height:28px"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wind agent -->
+        <div class="col-md-6">
+            <div class="card border-info h-100">
+                <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+                    <strong>💨 Wind Agent</strong>
+                    <span id="live-wind-badge" class="badge bg-secondary fs-6">—</span>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Energy offered</span>
+                        <strong><span id="live-wind-energy">—</span> kW</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">Price offered</span>
+                        <strong><span id="live-wind-price">—</span> €/kWh</strong>
+                    </div>
+                    <small class="text-muted">Last 15 strategies</small>
+                    <div id="wind-log" class="d-flex flex-wrap gap-1 mt-1" style="min-height:28px"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Negotiation log tabla -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📋 Negotiation Event Log</h5>
+            <small class="text-muted">Last 30 events</small>
+        </div>
+        <div class="card-body p-0" style="max-height:260px; overflow-y:auto;">
+            <table class="table table-sm table-striped mb-0" id="log-table">
+                <thead class="table-dark sticky-top">
+                    <tr>
+                        <th>Ep</th>
+                        <th>Step</th>
+                        <th>Demand kW</th>
+                        <th>Price €/kWh</th>
+                        <th>☀ Strategy</th>
+                        <th>☀ Energy kW</th>
+                        <th>💨 Strategy</th>
+                        <th>💨 Energy kW</th>
+                        <th>SoC %</th>
+                    </tr>
+                </thead>
+                <tbody id="log-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================================================== -->
+    <!-- RESULTADOS POR EPISODIO                            -->
+    <!-- ================================================== -->
+
+    <div class="card mb-4" id="ep-results-card" style="display:none">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">✅ Episode Results</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-striped mb-0" id="ep-results-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Episode</th>
+                        <th>Mode</th>
+                        <th>Grid kWh</th>
+                        <th>Renewable kWh</th>
+                        <th>Share %</th>
+                        <th>Avg SoC %</th>
+                        <th>Cost €</th>
+                        <th>Solar Dom.</th>
+                        <th>Wind Dom.</th>
+                        <th>Time s</th>
+                    </tr>
+                </thead>
+                <tbody id="ep-results-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================================================== -->
+    <!-- PLOTS ESTÁTICOS                                    -->
+    <!-- ================================================== -->
+
+    <div class="row g-4 mt-2">
+
+        <div class="col-lg-6">
+            <div class="card graph-card">
+                <div class="card-header"><h5>Solar Strategy Evolution (training)</h5></div>
+                <div class="card-body">
+                    <img src="/plot/05_strategies_solar.png" class="img-fluid">
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card graph-card">
+                <div class="card-header"><h5>Wind Strategy Evolution (training)</h5></div>
+                <div class="card-body">
+                    <img src="/plot/06_strategies_wind.png" class="img-fluid">
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card graph-card">
+                <div class="card-header"><h5>Solar Negotiation Heatmap</h5></div>
+                <div class="card-body">
+                    <img src="/plot/09_heatmap_solar_nego.png" class="img-fluid">
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card graph-card">
+                <div class="card-header"><h5>Wind Negotiation Heatmap</h5></div>
+                <div class="card-body">
+                    <img src="/plot/12_heatmap_wind_nego.png" class="img-fluid">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Tabla de estrategias -->
+    <div class="card mt-4">
+        <div class="card-header"><h5>Negotiation Strategies Reference</h5></div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Strategy</th><th>Behaviour</th><th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge bg-success">Honest</span></td>
+                        <td>Truthful declaration</td>
+                        <td>Real production and competitive pricing.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-warning text-dark">Hide Information</span></td>
+                        <td>Under-reporting</td>
+                        <td>Declares less energy than available.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-danger">Deception</span></td>
+                        <td>Over-reporting</td>
+                        <td>Declares more energy than available.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- ================================================== -->
+<!-- JAVASCRIPT                                         -->
+<!-- ================================================== -->
+
+<script>
+// ── Constantes ──────────────────────────────────────────
+
+const STRAT_COLOR = {
+    "honest":           { badge: "success",          chart: "rgba(25,135,84,0.85)"  },
+    "hide_information": { badge: "warning text-dark", chart: "rgba(255,193,7,0.85)" },
+    "deception":        { badge: "danger",            chart: "rgba(220,53,69,0.85)" }
+};
+
+const MAX_SOC_POINTS  = 100;   // puntos máx en gráfica SoC
+const MAX_LOG_ROWS    = 30;    // filas máx en tabla log
+
+// ── Estado ──────────────────────────────────────────────
+
+let es            = null;
+let solarLog      = [];
+let windLog       = [];
+let logRows       = [];
+let episodeResults = [];
+
+// Contadores de estrategias acumulados
+let solarCounts = { honest: 0, hide_information: 0, deception: 0 };
+let windCounts  = { honest: 0, hide_information: 0, deception: 0 };
+
+// ── Charts ──────────────────────────────────────────────
+
+const ctxSoc    = document.getElementById("chart-soc").getContext("2d");
+const ctxEnergy = document.getElementById("chart-energy").getContext("2d");
+const ctxSolar  = document.getElementById("chart-solar-strat").getContext("2d");
+const ctxWind   = document.getElementById("chart-wind-strat").getContext("2d");
+const ctxShare  = document.getElementById("chart-share").getContext("2d");
+
+const chartSoc = new Chart(ctxSoc, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [{
+            label: "Battery SoC %",
+            data: [],
+            borderColor: "rgba(13,110,253,0.9)",
+            backgroundColor: "rgba(13,110,253,0.1)",
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.3
+        }]
+    },
+    options: {
+        animation: false,
+        scales: {
+            y: { min: 0, max: 100, title: { display: true, text: "%" } },
+            x: { display: false }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
+
+const chartEnergy = new Chart(ctxEnergy, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: "Grid kWh",
+                data: [],
+                borderColor: "rgba(220,53,69,0.9)",
+                borderWidth: 1.5,
+                pointRadius: 0,
+                tension: 0.3
+            },
+            {
+                label: "Renewable kWh",
+                data: [],
+                borderColor: "rgba(25,135,84,0.9)",
+                borderWidth: 1.5,
+                pointRadius: 0,
+                tension: 0.3
+            }
+        ]
+    },
+    options: {
+        animation: false,
+        scales: {
+            x: { display: false },
+            y: { title: { display: true, text: "kWh" } }
+        },
+        plugins: { legend: { display: true, position: "top" } }
+    }
+});
+
+const STRAT_LABELS = ["Honest", "Hide Info", "Deception"];
+const STRAT_KEYS   = ["honest", "hide_information", "deception"];
+const STRAT_BG     = [
+    "rgba(25,135,84,0.85)",
+    "rgba(255,193,7,0.85)",
+    "rgba(220,53,69,0.85)"
+];
+
+const chartSolarStrat = new Chart(ctxSolar, {
+    type: "doughnut",
+    data: {
+        labels: STRAT_LABELS,
+        datasets: [{ data: [0, 0, 0], backgroundColor: STRAT_BG }]
+    },
+    options: {
+        animation: false,
+        plugins: { legend: { position: "bottom" } }
+    }
+});
+
+const chartWindStrat = new Chart(ctxWind, {
+    type: "doughnut",
+    data: {
+        labels: STRAT_LABELS,
+        datasets: [{ data: [0, 0, 0], backgroundColor: STRAT_BG }]
+    },
+    options: {
+        animation: false,
+        plugins: { legend: { position: "bottom" } }
+    }
+});
+
+const chartShare = new Chart(ctxShare, {
+    type: "bar",
+    data: {
+        labels: [],
+        datasets: [{
+            label: "Renewable Share %",
+            data: [],
+            backgroundColor: "rgba(25,135,84,0.75)",
+            borderRadius: 4
+        }]
+    },
+    options: {
+        animation: false,
+        scales: {
+            y: { min: 0, max: 100, title: { display: true, text: "%" } }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
+
+// ── Helpers ─────────────────────────────────────────────
+
+function badge(strategy) {
+    const c = (STRAT_COLOR[strategy] || {}).badge || "secondary";
+    return `<span class="badge bg-${c}">${strategy}</span>`;
+}
+
+function updateStratLog(arr, strategy, containerId, maxLen) {
+    arr.push(strategy);
+    if (arr.length > maxLen) arr.shift();
+    document.getElementById(containerId).innerHTML =
+        arr.map(badge).join(" ");
+}
+
+function pushChart(chart, label, ...values) {
+    chart.data.labels.push(label);
+    values.forEach((v, i) => chart.data.datasets[i].data.push(v));
+    if (chart.data.labels.length > MAX_SOC_POINTS) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(ds => ds.data.shift());
+    }
+    chart.update("none");
+}
+
+function updateDoughnut(chart, counts) {
+    chart.data.datasets[0].data = STRAT_KEYS.map(k => counts[k] || 0);
+    chart.update("none");
+}
+
+function addLogRow(ep, msg) {
+    const sc = (STRAT_COLOR[msg.solar_strategy] || {}).badge || "secondary";
+    const wc = (STRAT_COLOR[msg.wind_strategy]  || {}).badge || "secondary";
+    logRows.push(`
+        <tr>
+            <td>${ep}</td>
+            <td>${msg.t}</td>
+            <td>${msg.demand_kw}</td>
+            <td>${msg.price_eur_kwh}</td>
+            <td><span class="badge bg-${sc}">${msg.solar_strategy}</span></td>
+            <td>${msg.solar_energy_kw}</td>
+            <td><span class="badge bg-${wc}">${msg.wind_strategy}</span></td>
+            <td>${msg.wind_energy_kw}</td>
+            <td>${msg.battery_soc}</td>
+        </tr>`);
+    if (logRows.length > MAX_LOG_ROWS) logRows.shift();
+    document.getElementById("log-body").innerHTML = logRows.join("");
+    // auto-scroll al final
+    const tbody = document.getElementById("log-body").closest(".card-body");
+    if (tbody) tbody.scrollTop = tbody.scrollHeight;
+}
+
+function addEpisodeResult(ep, d) {
+    episodeResults.push(`
+        <tr>
+            <td>${ep}</td>
+            <td><span class="badge bg-secondary">${d.mode}</span></td>
+            <td>${d.grid_energy}</td>
+            <td>${d.renewable_energy}</td>
+            <td>${d.renewable_share}</td>
+            <td>${d.battery_soc}</td>
+            <td>${d.consumer_cost}</td>
+            <td>${badge(d.solar_strategy)}</td>
+            <td>${badge(d.wind_strategy)}</td>
+            <td>${d.t_simulate}</td>
+        </tr>`);
+    document.getElementById("ep-results-body").innerHTML = episodeResults.join("");
+    document.getElementById("ep-results-card").style.display = "block";
+
+    // Añadir barra en chart share
+    chartShare.data.labels.push("Ep " + ep);
+    chartShare.data.datasets[0].data.push(d.renewable_share);
+    chartShare.update("none");
+}
+
+// ── Reset ────────────────────────────────────────────────
+
+function resetPanel() {
+    if (es) { es.close(); es = null; }
+
+    solarLog = []; windLog = []; logRows = []; episodeResults = [];
+    solarCounts = { honest: 0, hide_information: 0, deception: 0 };
+    windCounts  = { honest: 0, hide_information: 0, deception: 0 };
+
+    ["solar-log","wind-log","log-body","ep-results-body"].forEach(id => {
+        document.getElementById(id).innerHTML = "";
+    });
+
+    document.getElementById("ep-results-card").style.display = "none";
+
+    [chartSoc, chartEnergy].forEach(ch => {
+        ch.data.labels = [];
+        ch.data.datasets.forEach(ds => ds.data = []);
+        ch.update("none");
+    });
+
+    chartShare.data.labels = [];
+    chartShare.data.datasets[0].data = [];
+    chartShare.update("none");
+
+    updateDoughnut(chartSolarStrat, solarCounts);
+    updateDoughnut(chartWindStrat,  windCounts);
+
+    ["kpi-episode","kpi-soc","kpi-grid","kpi-renew","kpi-cost","kpi-elapsed"].forEach(id => {
+        document.getElementById(id).textContent = "—";
+    });
+    ["live-solar-energy","live-solar-price","live-wind-energy","live-wind-price"].forEach(id => {
+        document.getElementById(id).textContent = "—";
+    });
+    document.getElementById("live-solar-badge").textContent = "—";
+    document.getElementById("live-solar-badge").className   = "badge bg-secondary fs-6";
+    document.getElementById("live-wind-badge").textContent  = "—";
+    document.getElementById("live-wind-badge").className    = "badge bg-secondary fs-6";
+
+    setProgress(0, 0, 0, 0);
+
+    const btn = document.getElementById("btn-run");
+    btn.disabled = false;
+    btn.textContent = "▶ Run Simulation";
+}
+
+function setProgress(epCurrent, epTotal, stepPct, stepAnimated) {
+    const epPct = epTotal > 0 ? Math.round(epCurrent / epTotal * 100) : 0;
+    document.getElementById("ep-bar").style.width   = epPct + "%";
+    document.getElementById("step-bar").style.width = stepPct + "%";
+    document.getElementById("ep-progress-label").textContent =
+        "Episodes: " + epCurrent + " / " + epTotal;
+    document.getElementById("step-progress-label").textContent =
+        "Step: " + stepPct + " %";
+
+    const stepBar = document.getElementById("step-bar");
+    if (stepAnimated) {
+        stepBar.classList.add("progress-bar-animated","progress-bar-striped");
+    } else {
+        stepBar.classList.remove("progress-bar-animated","progress-bar-striped");
+    }
+}
+
+// ── Arrancar stream ──────────────────────────────────────
+
+function startStream() {
+
+    resetPanel();
+
+    const mode       = document.getElementById("sel-mode").value;
+    const n_episodes = document.getElementById("ep-slider").value;
+
+    const btn = document.getElementById("btn-run");
+    btn.disabled    = true;
+    btn.textContent = "⏳ Running…";
+
+    es = new EventSource("/stream/" + mode + "?n_episodes=" + n_episodes);
+
+    let currentEp = 0;
+    let socSum    = 0;
+    let socCount  = 0;
+
+    es.onmessage = function(event) {
+
+        const msg = JSON.parse(event.data);
+
+        // ── episode_start ──────────────────────────────
+        if (msg.type === "episode_start") {
+
+            currentEp = msg.episode;
+            socSum    = 0;
+            socCount  = 0;
+            document.getElementById("kpi-episode").textContent =
+                msg.episode + " / " + msg.n_episodes;
+            setProgress(msg.episode - 1, msg.n_episodes, 0, true);
+
+        // ── init ───────────────────────────────────────
+        } else if (msg.type === "init") {
+
+            setProgress(currentEp - 1, msg.n_episodes, 0, true);
+
+        // ── step ───────────────────────────────────────
+        } else if (msg.type === "step") {
+
+            // Progreso
+            setProgress(currentEp - 1, msg.n_episodes, msg.progress, true);
+
+            // Promedio de SoC acumulado en este episodio
+            socSum   += msg.battery_soc;
+            socCount += 1;
+            const avgSoc = (socSum / socCount).toFixed(2);
+
+            // KPIs
+            document.getElementById("kpi-soc").textContent     = avgSoc;
+            document.getElementById("kpi-grid").textContent    = msg.grid_energy_acc;
+            document.getElementById("kpi-renew").textContent   = msg.renewable_acc;
+            document.getElementById("kpi-cost").textContent    = msg.consumer_cost_acc;
+            document.getElementById("kpi-elapsed").textContent = msg.elapsed_sim_s;
+
+            // Gráficas de línea
+            pushChart(chartSoc,    msg.t, msg.battery_soc);
+            pushChart(chartEnergy, msg.t, msg.grid_energy_acc, msg.renewable_acc);
+
+            // Contadores estrategia
+            if (solarCounts[msg.solar_strategy] !== undefined)
+                solarCounts[msg.solar_strategy]++;
+            if (windCounts[msg.wind_strategy] !== undefined)
+                windCounts[msg.wind_strategy]++;
+
+            updateDoughnut(chartSolarStrat, solarCounts);
+            updateDoughnut(chartWindStrat,  windCounts);
+
+            // Agentes
+            const sc = (STRAT_COLOR[msg.solar_strategy] || {}).badge || "secondary";
+            document.getElementById("live-solar-badge").textContent = msg.solar_strategy;
+            document.getElementById("live-solar-badge").className   = "badge bg-" + sc + " fs-6";
+            document.getElementById("live-solar-energy").textContent = msg.solar_energy_kw;
+            document.getElementById("live-solar-price").textContent  = msg.solar_price;
+            updateStratLog(solarLog, msg.solar_strategy, "solar-log", 15);
+
+            const wc = (STRAT_COLOR[msg.wind_strategy] || {}).badge || "secondary";
+            document.getElementById("live-wind-badge").textContent = msg.wind_strategy;
+            document.getElementById("live-wind-badge").className   = "badge bg-" + wc + " fs-6";
+            document.getElementById("live-wind-energy").textContent = msg.wind_energy_kw;
+            document.getElementById("live-wind-price").textContent  = msg.wind_price;
+            updateStratLog(windLog, msg.wind_strategy, "wind-log", 15);
+
+            // Log tabla
+            addLogRow(currentEp, msg);
+
+        // ── result (fin de episodio) ───────────────────
+        } else if (msg.type === "result") {
+
+            setProgress(currentEp, msg.n_episodes, 100, false);
+            addEpisodeResult(currentEp, msg.data);
+
+            // Resetear gráficas de línea entre episodios (si hay más)
+            if (currentEp < msg.n_episodes) {
+                chartSoc.data.labels = [];
+                chartSoc.data.datasets[0].data = [];
+                chartEnergy.data.labels = [];
+                chartEnergy.data.datasets.forEach(ds => ds.data = []);
+            }
+
+        // ── done (todo terminado) ──────────────────────
+        } else if (msg.type === "done") {
+
+            btn.disabled    = false;
+            btn.textContent = "▶ Run Again";
+            es.close();
+            es = null;
+
+        }
+    };
+
+    es.onerror = function() {
+        btn.disabled    = false;
+        btn.textContent = "▶ Run Simulation";
+        if (es) { es.close(); es = null; }
+    };
+}
+</script>
+
+{% endblock %}
