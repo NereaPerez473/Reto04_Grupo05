@@ -5,7 +5,7 @@ Orden de ejecucion:
   1. ETL          (pipeline/etl.py)
   2. Inferencia   (pipeline/inference.py)
   3. Precios      (optimizacion/generar_precios_agentes.py)
-  4. Optimizacion — cuatro tasks en lugar del notebook completo:
+  4. Optimizacion — cuatro tasks:
        4a. tarea_setup_datos      -> carga datos y calcula cotas
        4b. tarea_run_nsgaii       -> ejecuta NSGA-II con best_params del DB
        4c. tarea_run_spea2        -> ejecuta SPEA2 con best_params del DB
@@ -20,8 +20,6 @@ from pathlib import Path
 
 from prefect import flow, task
 
-# Directorio raiz del proyecto dentro del contenedor (o en local si se ejecuta
-# directamente). Se sobreescribe con la variable de entorno APP_DIR.
 BASE_DIR = Path(os.environ.get("APP_DIR", Path(__file__).resolve().parent.parent))
 
 
@@ -79,7 +77,7 @@ def pipeline_microred() -> None:
     proc_dir.mkdir(parents=True, exist_ok=True)
     res_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1 – Feature engineering (paralelo: eolico y solar son independientes)
+    # 1 – Feature engineering (eolico y solar son independientes)
     path_feat_eolico = tarea_feature_engineering_eolico(
         ruta_entrada=str(raw_dir / "DatosEolicos.csv"),
         ruta_salida=str(proc_dir / "Features_Eolico.csv"),
@@ -89,7 +87,7 @@ def pipeline_microred() -> None:
         ruta_salida=str(proc_dir / "Features_Solar.csv"),
     )
 
-    # 2 – Inferencia (depende de los paths devueltos en el paso 1)
+    # 2 – Inferencia
     path_pred_eolico = tarea_predecir_eolico(
         ruta_datos=path_feat_eolico,
         ruta_modelo=str(mod_dir / "modelo_eolico.pkl"),
@@ -102,16 +100,13 @@ def pipeline_microred() -> None:
     )
 
     # 3 – Precios por agente
-    # Nota: los datos de entrada son CSVs de ESIOS en data/raw/Precios/
-    #       (independientes de la inferencia; esperamos a que termine para
-    #       mantener el orden logico del pipeline).
     _ = path_pred_eolico, path_pred_solar  # establece dependencia Prefect
     tarea_generar_precios(
         raw_dir=str(raw_dir / "Precios"),
         out_dir=str(proc_dir / "Precios"),
     )
 
-    # 4 – Optimizacion multiobjetivo en cuatro tasks
+    # 4 – Optimizacion multiobjetivo
     from optimizacion.optimizacion_tasks import ( 
         tarea_setup_datos,
         tarea_run_nsgaii,
@@ -122,7 +117,7 @@ def pipeline_microred() -> None:
     opt_results_dir = str(res_dir / "optimizacion")
     optuna_db       = str(opt_dir / "optuna_microred.db")
 
-    # 4a – Carga de datos y calculo de cotas (depende de precios e inferencia)
+    # 4a – Carga de datos y calculo de cotas
     datos_ctx = tarea_setup_datos(
         data_dir_raw=str(raw_dir),
         data_dir_processed=str(proc_dir),
