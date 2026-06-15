@@ -3,10 +3,10 @@ simple_battery.py
 =================
 Modelo físico simplificado de batería para el sistema MAS Q-Learning.
 
-Parámetros actualizados a los del Reto 3
+Parámetros 
 -----------------------------------------
-    capacity_kwh = 200 kWh  (antes 50)
-    max_power_kw =  50 kW   (antes 10)
+    capacity_kwh = 200 kWh 
+    max_power_kw =  50 kW  
     efficiency   =  0.95/dirección → ~0.90 round-trip
     soc_min      =  0.05    → 10 kWh mínimo (5% de 200)
     duration     =  4 h     (200 kWh / 50 kW)

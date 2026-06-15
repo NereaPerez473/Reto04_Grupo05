@@ -1,5 +1,3 @@
-"""plot_qlearning_strategies.py"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -81,13 +79,16 @@ plt.savefig(PLOTS_DIR / "04_grid_purchased.png")
 plt.close()
 
 # ==================================================
-# 3. EVOLUCIÓN DE ESTRATEGIAS (Solo Negociación)
+# 3. EVOLUCIÓN DE ESTRATEGIAS
 # ==================================================
 def plot_strategy_evolution(df, agent_prefix, title, filename):
+    # Verificación de seguridad por si no se han reentrenado los modelos
+    if f"{agent_prefix}_honest" not in df.columns:
+        print(f"Aviso: Omitiendo {filename}. Las columnas de estrategia no están en el CSV.")
+        return
+
     plt.figure(figsize=(10, 6))
     
-    # Calcular % de uso por episodio (total de pasos = n_steps - 1)
-    # Asumimos n_steps fijo para normalizar, o directamente graficamos recuentos
     plt.plot(df["episode"], df[f"{agent_prefix}_honest"].rolling(WINDOW).mean(), label="Honest", color="green")
     plt.plot(df["episode"], df[f"{agent_prefix}_hide"].rolling(WINDOW).mean(), label="Hiding (Premium)", color="orange")
     plt.plot(df["episode"], df[f"{agent_prefix}_deception"].rolling(WINDOW).mean(), label="Deception (Dumping)", color="red")
@@ -100,21 +101,27 @@ def plot_strategy_evolution(df, agent_prefix, title, filename):
     plt.savefig(PLOTS_DIR / filename)
     plt.close()
 
+# Negociación (Nombres originales respetados)
 plot_strategy_evolution(negotiation_df, "solar", "Solar Agent (Negotiation Mode)", "05_strategies_solar.png")
 plot_strategy_evolution(negotiation_df, "wind", "Eolic Agent (Negotiation Mode)", "06_strategies_wind.png")
+
+# Competitivo (Nuevos archivos)
+plot_strategy_evolution(competitive_df, "solar", "Solar Agent (Competitive Mode)", "13_strategies_solar_comp.png")
+plot_strategy_evolution(competitive_df, "wind", "Eolic Agent (Competitive Mode)", "14_strategies_wind_comp.png")
+
+# Cooperativo (Nuevos archivos)
+plot_strategy_evolution(cooperative_df, "solar", "Solar Agent (Cooperative Mode)", "15_strategies_solar_coop.png")
+plot_strategy_evolution(cooperative_df, "wind", "Eolic Agent (Cooperative Mode)", "16_strategies_wind_coop.png")
 
 # ==================================================
 # 4. HEATMAPS ADAPTATIVOS
 # ==================================================
 def save_heatmap(qtable, title, filename):
-    # Detección de dimensionalidad
     if qtable.ndim == 4:
         # Estado 3D (Competitivo/Cooperativo)
-        # qtable shape: (Demanda, Precio, SoC, Acción) -> colapsar SoC y Acción
         heatmap = np.max(qtable, axis=(2, 3))
     elif qtable.ndim == 5:
         # Estado 4D (Negociación)
-        # qtable shape: (Demanda, Precio, Prod_Propia, SoC, Acción) -> colapsar Prod, SoC y Acción
         heatmap = np.max(qtable, axis=(2, 3, 4))
     else:
         return
@@ -132,6 +139,7 @@ def save_heatmap(qtable, title, filename):
     plt.savefig(PLOTS_DIR / filename)
     plt.close()
 
+# Nombres originales respetados en los heatmaps
 save_heatmap(comp_solar_q, "Max Q-Value Solar (Competitive)", "07_heatmap_solar_comp.png")
 save_heatmap(coop_solar_q, "Max Q-Value Solar (Cooperative)", "08_heatmap_solar_coop.png")
 save_heatmap(nego_solar_q, "Max Q-Value Solar (Negotiation)", "09_heatmap_solar_nego.png")

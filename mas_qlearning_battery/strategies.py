@@ -20,8 +20,6 @@ La discrepancia declared vs real es el núcleo del análisis de estrategias:
 - Si declared < real  → ocultación → el consumidor paga más por menos cantidad
 - Si declared == real → honestidad → no hay distorsión
 
-Referencia en el paper: analizar cómo cada estrategia afecta al coste total
-del consumidor y a los ingresos de los productores.
 """
 
 from dataclasses import dataclass

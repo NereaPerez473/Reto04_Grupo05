@@ -3,8 +3,7 @@ train_multiagent_qlearning_competitivo_battery.py
 =================================================
 Entrenamiento competitivo con batería pasiva.
 
-Cambios respecto a train_multiagent_qlearning_competitivo.py
--------------------------------------------------------------
+
 1. Batería (200 kWh, 50 kW) actúa como buffer pasivo ANTES de la negociación:
      - Excedente renovable → carga batería
      - Déficit renovable   → descarga batería (hasta soc_min)
@@ -98,6 +97,13 @@ wind_q_history         = []
 battery_soc_history    = []     # SoC medio por episodio
 grid_purchased_history = []     # kWh totales de red por episodio
 
+solar_honest_history    = []
+solar_hide_history      = []
+solar_deception_history = []
+wind_honest_history     = []
+wind_hide_history       = []
+wind_deception_history  = []
+
 # ==================================================
 # ENTRENAMIENTO
 # ==================================================
@@ -110,6 +116,9 @@ for episode in range(N_EPISODES):
     wind_total_reward   = 0.0
     episode_soc         = []
     episode_grid_kwh    = 0.0
+
+    solar_honest = solar_hide = solar_deception = 0
+    wind_honest  = wind_hide  = wind_deception  = 0
 
     for t in range(n_steps - 1):
 
@@ -142,6 +151,15 @@ for episode in range(N_EPISODES):
         wind_action    = wind_agent.choose_action(wind_state)
         solar_strategy = solar_agent.action_to_strategy(solar_action)
         wind_strategy  = wind_agent.action_to_strategy(wind_action)
+
+        # Contadores de estrategia
+        if solar_action == 0:   solar_honest    += 1
+        elif solar_action == 1: solar_hide      += 1
+        else:                   solar_deception += 1
+
+        if wind_action == 0:    wind_honest     += 1
+        elif wind_action == 1:  wind_hide       += 1
+        else:                   wind_deception  += 1
 
         # ==========================================
         # PRODUCCIÓN DECLARADA
@@ -226,7 +244,6 @@ for episode in range(N_EPISODES):
         # Castigo dinámico por vulnerabilidad de la red
         dynamic_penalty_factor = 3.0 - (2.0 * battery.soc)
 
-        # Aplicamos el factor dinámico en lugar del 2.0 fijo
         solar_reward = solar_revenue - (dynamic_penalty_factor * solar_declared_excess * current_price)
         wind_reward  = wind_revenue  - (dynamic_penalty_factor * wind_declared_excess * current_price)
 
@@ -255,6 +272,12 @@ for episode in range(N_EPISODES):
     wind_q_history.append(np.mean(wind_agent.q_table))
     battery_soc_history.append(float(np.mean(episode_soc)) if episode_soc else 0.5)
     grid_purchased_history.append(episode_grid_kwh)
+    solar_honest_history.append(solar_honest)
+    solar_hide_history.append(solar_hide)
+    solar_deception_history.append(solar_deception)
+    wind_honest_history.append(wind_honest)
+    wind_hide_history.append(wind_hide)
+    wind_deception_history.append(wind_deception)
 
     solar_agent.epsilon = max(0.01, solar_agent.epsilon * 0.999)
     wind_agent.epsilon  = max(0.01, wind_agent.epsilon  * 0.999)
@@ -280,6 +303,12 @@ results_df = pd.DataFrame({
     "wind_q_mean":       wind_q_history,
     "battery_soc_mean":  battery_soc_history,
     "grid_purchased_kwh": grid_purchased_history,
+    "solar_honest":       solar_honest_history,
+    "solar_hide":         solar_hide_history,
+    "solar_deception":    solar_deception_history,
+    "wind_honest":        wind_honest_history,
+    "wind_hide":          wind_hide_history,
+    "wind_deception":     wind_deception_history
 })
 
 path = OUTPUT_DIR / "competitive_battery_results.csv"

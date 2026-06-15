@@ -4,7 +4,7 @@ strategy_qlearning_battery.py
 Agente Q-Learning para AS/AE en los modos COMPETITIVO y COOPERATIVO
 con batería pasiva.
 
-Diferencia respecto a strategy_qlearning.py (sin batería)
+Se incluye batería (SoC)
 -----------------------------------------------------------
 El estado incluye el SoC discretizado de la batería como tercera
 dimensión. Esto permite que AS y AE aprendan a adaptar su estrategia
