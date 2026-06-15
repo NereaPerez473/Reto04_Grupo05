@@ -103,5 +103,4 @@ if __name__ == "__main__":
             ruta_salida=str(res_solar)
         )
         
-    # Recuerda tener `prefect server start` ejecutándose en otra terminal
     prueba_inferencia()
