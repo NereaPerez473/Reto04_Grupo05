@@ -45,7 +45,7 @@ def tarea_generar_precios(raw_dir: str, out_dir: str) -> str:
 
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(BASE_DIR / "optimizacion"))
-    import generar_precios_agentes  # noqa: PLC0415
+    import generar_precios_agentes 
 
     generar_precios_agentes.main(raw_dir=raw_dir, out_dir=out_dir)
     return out_dir
@@ -55,12 +55,17 @@ def tarea_generar_precios(raw_dir: str, out_dir: str) -> str:
 # Flow principal
 # ---------------------------------------------------------------------------
 @flow(name="Pipeline Microred Multiagente", log_prints=True)
+<<<<<<< HEAD
 def pipeline_microred(start_hour: int = 0) -> None:
     from pipeline.etl import (  # noqa: PLC0415
+=======
+def pipeline_microred() -> None:
+    from pipeline.etl import ( 
+>>>>>>> 92a0f5a2b60df0e2c9c5698219aa491f14690b47
         tarea_feature_engineering_eolico,
         tarea_feature_engineering_solar,
     )
-    from pipeline.inference import (  # noqa: PLC0415
+    from pipeline.inference import ( 
         tarea_predecir_eolico,
         tarea_predecir_solar,
     )
@@ -107,7 +112,7 @@ def pipeline_microred(start_hour: int = 0) -> None:
     )
 
     # 4 – Optimizacion multiobjetivo en cuatro tasks
-    from optimizacion.optimizacion_tasks import (  # noqa: PLC0415
+    from optimizacion.optimizacion_tasks import ( 
         tarea_setup_datos,
         tarea_run_nsgaii,
         tarea_run_spea2,
