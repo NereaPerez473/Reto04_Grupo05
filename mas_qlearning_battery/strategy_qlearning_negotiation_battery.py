@@ -3,7 +3,7 @@ strategy_qlearning_negotiation_battery.py
 ==========================================
 Agente Q-Learning para AS/AE en el modo NEGOCIACIÓN con batería pasiva.
 
-Diferencia respecto a strategy_qlearning_negotiation.py (sin batería)
+Se incluye batería (SoC)
 -----------------------------------------------------------------------
 El estado incluye el SoC de la batería como cuarta dimensión, además
 de la producción propia que ya tenía la versión sin batería.
