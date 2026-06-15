@@ -320,7 +320,7 @@ _DASHBOARD_HTML = r"""
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Microgrid Multi-Agent — Dashboard</title>
+  <title>Multi-Objective Optimization for Energy Dispatch — Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; }
