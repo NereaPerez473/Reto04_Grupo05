@@ -40,9 +40,9 @@ services:
       - MPLBACKEND=Agg
     command: python pipeline/flow.py
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models:ro
-      - ./optimizacion:/app/optimizacion
+      - ../data:/app/data
+      - ../models:/app/models:ro
+      - ../optimizacion:/app/optimizacion
     restart: "no"
 
   # ------------------------------------------------------------------ #
@@ -64,9 +64,9 @@ services:
       - WINDOW_HOURS=24
     command: python pipeline/scheduler.py
     volumes:
-      - ./data:/app/data
-      - ./models:/app/models:ro
-      - ./optimizacion:/app/optimizacion
+      - ../data:/app/data
+      - ../models:/app/models:ro
+      - ../optimizacion:/app/optimizacion
     restart: unless-stopped
 
   # ------------------------------------------------------------------ #
@@ -87,8 +87,8 @@ services:
       - "5000:5000"
     volumes:
       # Solo lectura: la API no modifica los datos
-      - ./data:/app/data:ro
-      - ./optimizacion:/app/optimizacion:ro
+      - ../data:/app/data:ro
+      - ../optimizacion:/app/optimizacion:ro
 
 volumes:
   prefect_data:

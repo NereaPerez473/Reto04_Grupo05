@@ -53,13 +53,8 @@ def tarea_generar_precios(raw_dir: str, out_dir: str) -> str:
 # Flow principal
 # ---------------------------------------------------------------------------
 @flow(name="Pipeline Microred Multiagente", log_prints=True)
-<<<<<<< HEAD
 def pipeline_microred(start_hour: int = 0) -> None:
-    from pipeline.etl import (  # noqa: PLC0415
-=======
-def pipeline_microred() -> None:
-    from pipeline.etl import ( 
->>>>>>> 92a0f5a2b60df0e2c9c5698219aa491f14690b47
+    from pipeline.etl import (
         tarea_feature_engineering_eolico,
         tarea_feature_engineering_solar,
     )

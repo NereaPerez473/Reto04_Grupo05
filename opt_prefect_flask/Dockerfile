@@ -26,7 +26,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # ---- Codigo fuente (sin datos ni modelos) ----------------------------------
 COPY pipeline/   ./pipeline/
-COPY optimizacion/ ./optimizacion/
 COPY flask_api/  ./flask_api/
 
 # Directorios que seran llenados por los bind mounts en tiempo de ejecucion
