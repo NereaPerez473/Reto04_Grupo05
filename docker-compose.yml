@@ -22,13 +22,14 @@ services:
       start_period: 30s
 
   # ------------------------------------------------------------------ #
-  # 2. Worker del pipeline — ETL → Inferencia → Precios → Optimización  #
-  #    Arranca cuando el servidor Prefect está listo, ejecuta el flow   #
-  #    y termina. Relanzar con: docker compose run --rm pipeline-worker  #
+  # 2. Worker manual (one-shot) — solo arranca con:                     #
+  #    docker compose --profile manual run --rm pipeline-worker         #
+  #    Útil para forzar un run puntual sin el scheduler continuo.       #
   # ------------------------------------------------------------------ #
   pipeline-worker:
     build: .
     container_name: pipeline_worker
+    profiles: [manual]
     depends_on:
       prefect-server:
         condition: service_healthy
@@ -39,16 +40,37 @@ services:
       - MPLBACKEND=Agg
     command: python pipeline/flow.py
     volumes:
-      # Datos de entrada y salida (lectura/escritura)
       - ./data:/app/data
-      # Modelos pre-entrenados (solo lectura; demasiado grandes para la imagen)
       - ./models:/app/models:ro
-      # Directorio de optimizacion: el notebook escribe optuna_microred.db aqui
       - ./optimizacion:/app/optimizacion
     restart: "no"
 
   # ------------------------------------------------------------------ #
-  # 3. Flask API — consulta persistente de resultados                   #
+  # 3. Scheduler — lanza el pipeline cada 2 min con ventana deslizante  #
+  #    Avanza 24 h por ejecución; guarda estado en data/pipeline_state  #
+  # ------------------------------------------------------------------ #
+  scheduler:
+    build: .
+    container_name: pipeline_scheduler
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - APP_DIR=/app
+      - PYTHONPATH=/app:/app/models:/app/optimizacion
+      - MPLBACKEND=Agg
+      - SCHEDULER_INTERVAL=120
+      - WINDOW_HOURS=24
+    command: python pipeline/scheduler.py
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models:ro
+      - ./optimizacion:/app/optimizacion
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------ #
+  # 4. Flask API — consulta persistente de resultados                   #
   #    http://localhost:5000/api/optuna/studies                         #
   #    http://localhost:5000/api/results/predicciones/eolico            #
   # ------------------------------------------------------------------ #

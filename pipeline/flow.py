@@ -55,7 +55,7 @@ def tarea_generar_precios(raw_dir: str, out_dir: str) -> str:
 # Flow principal
 # ---------------------------------------------------------------------------
 @flow(name="Pipeline Microred Multiagente", log_prints=True)
-def pipeline_microred() -> None:
+def pipeline_microred(start_hour: int = 0) -> None:
     from pipeline.etl import (  # noqa: PLC0415
         tarea_feature_engineering_eolico,
         tarea_feature_engineering_solar,
@@ -123,6 +123,7 @@ def pipeline_microred() -> None:
         data_dir_processed=str(proc_dir),
         data_dir_results=str(res_dir),
         output_dir=opt_results_dir,
+        start_hour=start_hour,
     )
 
     # 4b y 4c – Ejecucion de cada algoritmo con best_params guardados en el DB

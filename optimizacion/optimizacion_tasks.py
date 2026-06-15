@@ -21,6 +21,7 @@ import os
 import random
 import time
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +56,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 # Parametros globales (pueden sobreescribirse via argumentos de las tasks)
 # ---------------------------------------------------------------------------
 BASE_SEED = 42
-T_HOURS = 168
+T_HOURS = 24
 START_HOUR = 0
 PRED_YEAR = 2020
 BATTERY_HOURS = 3.0
@@ -64,8 +65,8 @@ BATTERY_EFF_D = 0.95
 BATTERY_SOC_MIN = 0.10
 BATTERY_SOC_MAX = 0.90
 BATTERY_SOC_INI = 0.50
-POPULATION_SIZE = 200
-GENERATIONS_FINAL = 500
+POPULATION_SIZE = 100
+GENERATIONS_FINAL = 100
 MARGIN = 0.1
 
 
@@ -425,6 +426,7 @@ def tarea_setup_datos(
         "F1_MIN": F1_MIN, "F1_MAX": F1_MAX,
         "F2_MIN": F2_MIN, "F2_MAX": F2_MAX,
         "output_dir": output_dir,
+        "start_hour":  start_hour,
     }
 
 
@@ -771,5 +773,38 @@ def tarea_analizar_resultados(
     with open(str(ruta_metricas), "w") as f:
         json.dump(metricas, f, indent=2)
     print(f"Guardado: {ruta_metricas}")
+
+    # Pareto front data for the real-time API (Chart.js scatter)
+    pareto_api = {
+        "timestamp":        datetime.now(timezone.utc).isoformat(),
+        "window_start_hour": datos.get("start_hour", 0),
+        "window_hours":      T,
+        "fronts": {
+            algo: [[float(v) for v in s["objectives"]] for s in fd]
+            for algo, fd in pareto_fronts.items()
+        },
+    }
+    ruta_pareto_api = output_dir / "pareto_fronts.json"
+    with open(str(ruta_pareto_api), "w") as f:
+        json.dump(pareto_api, f)
+    print(f"Guardado: {ruta_pareto_api}")
+
+    # Append to execution-times history (keep last 20 runs)
+    times_file = output_dir / "execution_times.json"
+    times_history: list = []
+    if times_file.exists():
+        with open(str(times_file)) as f:
+            times_history = json.load(f)
+    times_history.append({
+        "timestamp":        datetime.now(timezone.utc).isoformat(),
+        "window_start_hour": datos.get("start_hour", 0),
+        "NSGAII":           round(res_nsgaii["elapsed_s"], 2),
+        "SPEA2":            round(res_spea2["elapsed_s"],  2),
+    })
+    times_history = times_history[-20:]
+    with open(str(times_file), "w") as f:
+        json.dump(times_history, f)
+    print(f"Guardado: {times_file}")
+
     print(f"\nTodos los resultados en: {output_dir}")
     return str(output_dir)
