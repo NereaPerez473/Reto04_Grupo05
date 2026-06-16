@@ -3,61 +3,82 @@ from flask import (
     render_template,
     Response,
     stream_with_context,
-    request
+    request,
+    redirect,
+    url_for,
+    jsonify
 )
 
 import json
-
+import threading
+import os
 
 app = Flask(__name__)
 
+# Prefect UI base URL (override with env var PREFECT_UI_URL if needed)
+PREFECT_UI_URL = os.environ.get("PREFECT_UI_URL", "http://localhost:4200")
+
 # ==================================================
-# PÁGINA PRINCIPAL (única pantalla: negociación)
+# REDIRECCIÓN RAÍZ → TRAINING
 # ==================================================
 
 @app.route("/")
-def negotiation():
+def index():
+    return redirect(url_for("training"))
 
-    return render_template("negotiation.html")
+@app.route("/training")
+def training():
+    return render_template("training.html")
+
 
 # ==================================================
-# SSE: STREAMING EN TIEMPO REAL
+# SSE: ENTRENAMIENTO EN TIEMPO REAL
 # ==================================================
 
-@app.route("/stream/<mode>")
-def stream_evaluation(mode):
-    """
-    Endpoint SSE que emite eventos en tiempo real.
-    Parámetros query:
-      - n_episodes (int, default 1): número de episodios
-    """
+@app.route("/train/<mode>")
+def stream_training(mode):
 
     if mode not in ["competitive", "cooperative", "negotiation"]:
-        mode = "negotiation"
+        mode = "competitive"
 
     try:
-        n_episodes = int(request.args.get("n_episodes", 1))
-        n_episodes = max(1, min(n_episodes, 50))
+        n_episodes = int(request.args.get("n_episodes", 200))
+        n_episodes = max(1, min(n_episodes, 2000))
     except (ValueError, TypeError):
-        n_episodes = 1
+        n_episodes = 200
+
+    save_qtables = request.args.get("save", "1") != "0"
+
+    # ==========================================
+    # LANZAR PREFECT EN PARALELO
+    # ==========================================
+
+    def launch_prefect():
+        from prefect_pipeline import training_flow
+
+        training_flow(
+            mode=mode,
+            n_episodes=n_episodes
+        )
+
+    threading.Thread(
+        target=launch_prefect,
+        daemon=True
+    ).start()
+
+    # ==========================================
+    # SSE NORMAL
+    # ==========================================
 
     def generate():
+        from sma_trainer import run_training_streaming
 
-        from sma_evaluator import run_evaluation_streaming
-
-        for episode in range(1, n_episodes + 1):
-
-            # Marcador de inicio de episodio
-            yield f"data: {json.dumps({'type': 'episode_start', 'episode': episode, 'n_episodes': n_episodes})}\n\n"
-
-            for event in run_evaluation_streaming(mode):
-
-                # Inyectar número de episodio en cada evento
-                event["episode"]    = episode
-                event["n_episodes"] = n_episodes
-                yield f"data: {json.dumps(event)}\n\n"
-
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        for event in run_training_streaming(
+            mode,
+            n_episodes,
+            save_qtables
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -67,6 +88,7 @@ def stream_evaluation(mode):
             "X-Accel-Buffering": "no"
         }
     )
+
 
 # ==================================================
 # MAIN

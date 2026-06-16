@@ -1,168 +1,72 @@
-from prefect import flow
-from prefect import task
-
-from sma_evaluator import run_evaluation
-
-from pathlib import Path
-import pandas as pd
-import time
+from prefect import flow, task, get_run_logger
+from sma_trainer import run_training_streaming
 
 
-# ==================================================
-# TASK 1
-# ==================================================
+@task
+def initialize(mode, n_episodes):
 
-@task(name="Load Data")
-def load_data():
+    logger = get_run_logger()
 
-    t0 = time.perf_counter()
-
-    result = {
-        "solar": True,
-        "wind": True,
-        "load": True,
-        "price": True
-    }
-
-    elapsed = round(time.perf_counter() - t0, 4)
-
-    return result, elapsed
-
-
-# ==================================================
-# TASK 2
-# ==================================================
-
-@task(name="Load Q-Tables")
-def load_qtables(mode):
-
-    t0 = time.perf_counter()
-
-    result = {
-        "mode": mode
-    }
-
-    elapsed = round(time.perf_counter() - t0, 4)
-
-    return result, elapsed
-
-
-# ==================================================
-# TASK 3
-# ==================================================
-
-@task(name="Simulate Episode")
-def simulate_episode(mode):
-
-    t0 = time.perf_counter()
-
-    result = run_evaluation(mode)
-
-    elapsed = round(time.perf_counter() - t0, 4)
-
-    return result, elapsed
-
-
-# ==================================================
-# TASK 4
-# ==================================================
-
-@task(name="Generate Metrics")
-def generate_metrics(result):
-
-    t0 = time.perf_counter()
-
-    metrics = {
-
-        "grid_energy": result["grid_energy"],
-        "battery_soc": result["battery_soc"],
-        "renewable_energy": result["renewable_energy"],
-        "renewable_share": result["renewable_share"],
-
-        "consumer_cost": result["consumer_cost"],
-        "solar_revenue": result["solar_revenue"],
-        "wind_revenue": result["wind_revenue"],
-
-        "solar_strategy": result["solar_strategy"],
-        "wind_strategy": result["wind_strategy"],
-
-        "mode": result["mode"]
-    }
-
-    elapsed = round(time.perf_counter() - t0, 4)
-
-    return metrics, elapsed
-
-
-# ==================================================
-# TASK 5
-# ==================================================
-
-@task(name="Save Results")
-def save_results(metrics):
-
-    t0 = time.perf_counter()
-
-    output_dir = Path("/project/results")
-
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True
+    logger.info(
+        f"Starting training | mode={mode} | episodes={n_episodes}"
     )
 
-    pd.DataFrame(
-        [metrics]
-    ).to_csv(
-        output_dir / "latest_results.csv",
-        index=False
+    return {
+        "mode": mode,
+        "n_episodes": n_episodes
+    }
+
+
+@task
+def train_episode(event):
+
+    logger = get_run_logger()
+
+    logger.info(
+        f"Episode {event['episode']} | "
+        f"reward={event['total_reward']} | "
+        f"grid={event['grid_kwh']}"
     )
 
-    elapsed = round(time.perf_counter() - t0, 4)
-
-    return True, elapsed
+    return event
 
 
-# ==================================================
-# FLOW
-# ==================================================
+@task
+def finalize(event):
 
-@flow(
-    name="Evaluate Microgrid"
-)
-def evaluate_flow(
-    mode="competitive"
+    logger = get_run_logger()
+
+    logger.info(
+        f"Training completed | "
+        f"SolarQ={event['q_solar_mean']} | "
+        f"WindQ={event['q_wind_mean']}"
+    )
+
+    return event
+
+
+@flow(name="Microgrid Training")
+def training_flow(
+    mode="competitive",
+    n_episodes=200
 ):
 
-    flow_start = time.perf_counter()
+    initialize(mode, n_episodes)
 
-    _, t_load_data = load_data()
+    final_event = None
 
-    _, t_load_qtables = load_qtables(mode)
+    for event in run_training_streaming(
+        mode=mode,
+        n_episodes=n_episodes,
+        save_qtables=True
+    ):
 
-    simulation_result, t_simulate = simulate_episode(mode)
+        if event["type"] == "train_episode":
 
-    metrics, t_metrics = generate_metrics(
-        simulation_result
-    )
+            train_episode.submit(event)
 
-    _, t_save = save_results(
-        metrics
-    )
+        elif event["type"] == "train_done":
 
-    total_elapsed = round(
-        time.perf_counter() - flow_start, 4
-    )
+            final_event = finalize(event)
 
-    # Tiempos de cada tarea del flow
-    task_times = {
-        "Load Data": t_load_data,
-        "Load Q-Tables": t_load_qtables,
-        "Simulate Episode": t_simulate,
-        "Generate Metrics": t_metrics,
-        "Save Results": t_save,
-        "Total Flow": total_elapsed
-    }
-
-    metrics["task_times"] = task_times
-
-    return metrics
+    return final_event

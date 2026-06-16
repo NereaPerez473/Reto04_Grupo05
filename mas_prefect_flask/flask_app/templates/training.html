@@ -1,0 +1,825 @@
+{% extends "base.html" %}
+
+{% block title %}Live Training — Microgrid SMA{% endblock %}
+
+{% block content %}
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+:root {
+    /* ── Mode colours ──────────────────────────────── */
+    --c-comp:  #e05c2a;   /* Competitive  — orange-red  */
+    --c-coop:  #1ea87a;   /* Cooperative  — emerald     */
+    --c-nego:  #7c4dcc;   /* Negotiation  — violet      */
+
+    /* ── Strategy colours ─────────────────────────── */
+    --c-honest:     #1a6fc4;   /* Blue          */
+    --c-hide:       #f0a500;   /* Amber         */
+    --c-deception:  #d93b3b;   /* Red           */
+
+    /* ── Neutral shades (kept for charts/bg) ─────── */
+    --c-blue-dark:  #0a1628;
+    --c-blue-mid:   #1a4b8c;
+    --c-blue:       #1a6fc4;
+    --c-blue-light: #2e8fd6;
+    --c-blue-pale:  #5b9bd5;
+    --c-blue-bg:    #dde6f0;
+}
+
+/* ── Mode buttons ───────────────────────────────────── */
+.mode-btn.active-comp { background: var(--c-comp); border-color: var(--c-comp); color: #fff; }
+.mode-btn.active-coop { background: var(--c-coop); border-color: var(--c-coop); color: #fff; }
+.mode-btn.active-nego { background: var(--c-nego); border-color: var(--c-nego); color: #fff; }
+
+/* ── Strategy bar segments ──────────────────────────── */
+.bg-honest    { background-color: var(--c-honest)    !important; color: #fff; }
+.bg-hide      { background-color: var(--c-hide)      !important; color: #fff; }
+.bg-deception { background-color: var(--c-deception) !important; color: #fff; }
+
+/* ── Prefect modal ──────────────────────────────────── */
+#prefect-toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+    background: #1e1b4b; color: #e0e7ff; border-radius: 8px;
+    padding: .85rem 1.1rem; font-size: .82rem; max-width: 320px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.35); display: none;
+    border-left: 4px solid #6366f1;
+}
+#prefect-toast a { color: #a5b4fc; }
+#prefect-toast .toast-close {
+    float: right; cursor: pointer; opacity: .7; margin-left: .5rem;
+    font-size: 1rem; line-height: 1; background: none; border: none; color: #e0e7ff;
+}
+</style>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CONTROL PANEL                                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="card mb-3">
+    <div class="card-header text-white d-flex justify-content-between align-items-center"
+         id="ctrl-header" style="background:#1a4b8c;padding:.55rem .9rem">
+        <span class="fw-bold" style="font-size:.9rem">Live Q-Learning Training</span>
+        <div class="d-flex align-items-center gap-3">
+            <span id="mode-badge" class="badge">Negotiation</span>
+            <span class="status-pill" id="status-pill">
+                <span class="status-dot" id="status-dot" style="background:#6e84a3"></span>
+                <span id="status-text">Idle</span>
+            </span>
+        </div>
+    </div>
+
+    <div class="card-body py-3">
+        <div class="row g-3 align-items-end">
+
+            <!-- Mode selector -->
+            <div class="col-12 col-md-5">
+                <div class="section-title mb-2">Training Mode</div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-outline-secondary mode-btn"
+                            onclick="selectMode('competitive')" id="btn-mode-comp">
+                        Competitive
+                    </button>
+                    <button class="btn btn-outline-secondary mode-btn"
+                            onclick="selectMode('cooperative')" id="btn-mode-coop">
+                        Cooperative
+                    </button>
+                    <button class="btn btn-outline-secondary mode-btn active-nego"
+                            onclick="selectMode('negotiation')" id="btn-mode-nego">
+                        Negotiation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Episodes slider -->
+            <div class="col-12 col-md-4">
+                <div class="section-title mb-2">
+                    Episodes: <span id="ep-label" style="color:#1a6fc4;font-weight:700">200</span>
+                </div>
+                <input id="ep-slider" type="range" class="form-range"
+                       min="10" max="1000" step="10" value="200"
+                       oninput="document.getElementById('ep-label').textContent = this.value">
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">10</small>
+                    <small class="text-muted">1000</small>
+                </div>
+            </div>
+
+            <!-- Save checkbox -->
+            <div class="col-6 col-md-1 d-flex align-items-end pb-1">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="chk-save" checked>
+                    <label class="form-check-label" style="font-size:.78rem;color:#4a5e7a" for="chk-save">Save Q-tables</label>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="col-12 col-md-3 d-flex gap-2 align-items-end flex-wrap">
+                <button id="btn-run" class="btn fw-bold"
+                        style="background:#1a6fc4;color:#fff;border-color:#1a6fc4;font-size:.82rem;flex:1 1 auto"
+                        onclick="startTraining()">
+                    ▶ Run Training
+                </button>
+                <button class="btn btn-outline-secondary" style="font-size:.82rem" onclick="resetPanel()">Reset</button>
+            </div>
+
+        </div>
+
+        <!-- Progress bar -->
+        <div class="mt-3">
+            <div class="d-flex justify-content-between mb-1">
+                <small class="text-muted">
+                    Episode <span id="prog-ep" style="font-weight:600;color:#1a2744">0</span>
+                    / <span id="prog-total">—</span>
+                    &nbsp;·&nbsp; Elapsed: <span id="prog-elapsed">0</span> s
+                </small>
+                <small class="text-muted">
+                    epsilon = <span id="prog-eps">1.0000</span>
+                    &nbsp;·&nbsp; ETA: <span id="prog-eta">—</span>
+                </small>
+            </div>
+            <div class="progress" style="height:8px">
+                <div id="prog-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                     style="width:0;background:#1a6fc4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- KPIs                                                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="row g-2 mb-3" id="kpi-row">
+
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="kpi-card highlight">
+            <span class="kpi-label">Total Reward</span>
+            <div class="kpi-value" id="kpi-reward">—</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="kpi-card">
+            <span class="kpi-label">Rolling Avg (x20)</span>
+            <div class="kpi-value" id="kpi-rolling">—</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="kpi-card">
+            <span class="kpi-label">Grid Energy</span>
+            <div class="kpi-value" id="kpi-grid">—</div>
+            <span class="kpi-unit">kWh</span>
+        </div>
+    </div>
+
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="kpi-card">
+            <span class="kpi-label">Avg Battery SoC</span>
+            <div class="kpi-value" id="kpi-soc">—</div>
+            <span class="kpi-unit">%</span>
+        </div>
+    </div>
+
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="kpi-card">
+            <span class="kpi-label">Q-mean Solar</span>
+            <div class="kpi-value" id="kpi-qsolar">—</div>
+        </div>
+    </div>
+
+    <div class="col-6 col-sm-4 col-lg-2">
+        <div class="kpi-card">
+            <span class="kpi-label">Q-mean Wind</span>
+            <div class="kpi-value" id="kpi-qwind">—</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CHARTS ROW 1                                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="row g-3 mb-3">
+
+    <div class="col-lg-8">
+        <div class="card chart-card h-100">
+            <div class="card-header">
+                <strong>Total Reward per Episode</strong>
+                <small class="ms-2">— with 20-episode rolling average</small>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-reward" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card chart-card h-100">
+            <div class="card-header">
+                <strong>Exploration Epsilon</strong>
+                <small class="ms-2">— decay per episode</small>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-eps" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CHARTS ROW 2                                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="row g-3 mb-3">
+
+    <div class="col-lg-4">
+        <div class="card chart-card h-100">
+            <div class="card-header">
+                <strong>Grid Energy per Episode</strong>
+                <small class="ms-2">kWh</small>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-grid" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card chart-card h-100">
+            <div class="card-header">
+                <strong>Q-table Mean</strong>
+                <small class="ms-2">— convergence indicator</small>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-q" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card chart-card h-100">
+            <div class="card-header">
+                <strong>Avg Battery SoC</strong>
+                <small class="ms-2">%</small>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-soc" height="140"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- STRATEGY DISTRIBUTION                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="row g-3 mb-3">
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Solar Agent — Strategy Mix</strong>
+                <span id="solar-dom-badge" class="badge" style="background:#1a6fc4">—</span>
+            </div>
+            <div class="card-body">
+                <div class="strat-bar mb-2" id="solar-strat-bar">
+                    <div class="seg bg-honest"    id="solar-bar-honest"    style="width:33%"></div>
+                    <div class="seg bg-hide"      id="solar-bar-hide"      style="width:33%"></div>
+                    <div class="seg bg-deception" id="solar-bar-deception" style="width:34%"></div>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="badge bg-honest">Honest <span id="solar-pct-honest">—</span>%</span>
+                    <span class="badge bg-hide">Hide <span id="solar-pct-hide">—</span>%</span>
+                    <span class="badge bg-deception">Deception <span id="solar-pct-deception">—</span>%</span>
+                </div>
+                <canvas id="chart-solar-strat" height="110"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Wind Agent — Strategy Mix</strong>
+                <span id="wind-dom-badge" class="badge" style="background:#1a6fc4">—</span>
+            </div>
+            <div class="card-body">
+                <div class="strat-bar mb-2" id="wind-strat-bar">
+                    <div class="seg bg-honest"    id="wind-bar-honest"    style="width:33%"></div>
+                    <div class="seg bg-hide"      id="wind-bar-hide"      style="width:33%"></div>
+                    <div class="seg bg-deception" id="wind-bar-deception" style="width:34%"></div>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="badge bg-honest">Honest <span id="wind-pct-honest">—</span>%</span>
+                    <span class="badge bg-hide">Hide <span id="wind-pct-hide">—</span>%</span>
+                    <span class="badge bg-deception">Deception <span id="wind-pct-deception">—</span>%</span>
+                </div>
+                <canvas id="chart-wind-strat" height="110"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- EPISODE LOG                                            -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Episode Log</strong>
+        <small class="text-muted">last 50 episodes</small>
+    </div>
+    <div class="card-body p-0" id="ep-log-wrap">
+        <table class="table table-sm table-hover mb-0" id="ep-log">
+            <thead class="table-dark sticky-top">
+                <tr>
+                    <th>Ep</th>
+                    <th>Total Reward</th>
+                    <th>Rolling x20</th>
+                    <th>Epsilon</th>
+                    <th>Grid kWh</th>
+                    <th>SoC %</th>
+                    <th>Solar Dom.</th>
+                    <th>Wind Dom.</th>
+                    <th>s/ep</th>
+                </tr>
+            </thead>
+            <tbody id="ep-log-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MODE REFERENCE TABLE                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="card mb-4">
+    <div class="card-header"><strong>Training Mode Reference</strong></div>
+    <div class="card-body p-0">
+        <table class="table table-sm table-striped mb-0" style="font-size:.78rem">
+            <thead>
+                <tr style="background:#f4f7fc">
+                    <th>Mode</th>
+                    <th>Reward Signal</th>
+                    <th>State Space</th>
+                    <th>Expected Behaviour</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge" style="background:#e05c2a">Competitive</span></td>
+                    <td>Individual revenue &minus; dynamic shortfall penalty</td>
+                    <td>Demand &times; Price &times; SoC (27 states)</td>
+                    <td>Each agent maximises own revenue; may bluff when battery is low</td>
+                </tr>
+                <tr>
+                    <td><span class="badge" style="background:#1ea87a">Cooperative</span></td>
+                    <td>Shared (revenue + battery savings &minus; 2&times; grid &minus; shortfall)</td>
+                    <td>Demand &times; Price &times; SoC (27 states)</td>
+                    <td>Agents coordinate to minimise grid dependency</td>
+                </tr>
+                <tr>
+                    <td><span class="badge" style="background:#7c4dcc">Negotiation</span></td>
+                    <td>Revenue + market-share bonus &minus; dynamic shortfall</td>
+                    <td>Demand &times; Price &times; Own Production &times; SoC (81 states)</td>
+                    <td>Agents aware of own production; balance honesty vs market-share</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- PREFECT TOAST                                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="prefect-toast">
+    <button class="toast-close" onclick="document.getElementById('prefect-toast').style.display='none'">✕</button>
+    <div style="font-weight:700;margin-bottom:.35rem">
+        <svg width="13" height="13" viewBox="0 0 32 32" fill="none" style="margin-top:-2px">
+            <circle cx="16" cy="16" r="16" fill="#6366f1"/>
+            <path d="M10 22V10l12 6-12 6z" fill="#fff"/>
+        </svg>
+        Prefect Flow launched
+    </div>
+    <div id="prefect-toast-msg">Starting evaluation flow…</div>
+    <div style="margin-top:.5rem">
+        <a id="prefect-toast-link" href="http://localhost:4200/runs" target="_blank">
+            Open Prefect UI →
+        </a>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT                                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<script>
+// ── Mode config — distinct colours ─────────────────────────
+const MODE_CFG = {
+    competitive: { color: "#e05c2a", label: "Competitive",
+                   btnId: "btn-mode-comp", activeClass: "active-comp" },
+    cooperative: { color: "#1ea87a", label: "Cooperative",
+                   btnId: "btn-mode-coop", activeClass: "active-coop" },
+    negotiation: { color: "#7c4dcc", label: "Negotiation",
+                   btnId: "btn-mode-nego", activeClass: "active-nego" }
+};
+
+// ── Strategy colours — clearly distinct ────────────────────
+const STRAT_COLORS = {
+    honest:           { bg: "#1a6fc4", label: "Honest"     },   // Blue
+    hide_information: { bg: "#f0a500", label: "Hide"       },   // Amber
+    deception:        { bg: "#d93b3b", label: "Deception"  }    // Red
+};
+
+// ── Global state ────────────────────────────────────────────
+let currentMode = "negotiation";
+let es = null;
+let logRows = [];
+const MAX_CHART_PTS = 300;
+const MAX_LOG_ROWS  = 50;
+
+const $ = id => document.getElementById(id);
+
+// ── Mode selector ───────────────────────────────────────────
+function selectMode(mode) {
+    currentMode = mode;
+    const cfg = MODE_CFG[mode];
+
+    $("ctrl-header").style.background = cfg.color;
+    $("mode-badge").textContent = cfg.label;
+
+    const btn = $("btn-run");
+    btn.style.background  = cfg.color;
+    btn.style.borderColor = cfg.color;
+
+    $("prog-bar").style.background = cfg.color;
+    document.querySelector(".kpi-card.highlight").style.borderColor = cfg.color;
+
+    // Reset all mode buttons
+    Object.keys(MODE_CFG).forEach(k => {
+        const b = $(MODE_CFG[k].btnId);
+        b.className = "btn btn-outline-secondary mode-btn";
+    });
+    $(cfg.btnId).classList.add(cfg.activeClass);
+}
+
+selectMode("negotiation");
+
+// ── Chart factory ───────────────────────────────────────────
+function makeLineChart(id, datasets, yLabel, yMin, yMax) {
+    return new Chart($(id).getContext("2d"), {
+        type: "line",
+        data: { labels: [], datasets },
+        options: {
+            animation: false,
+            responsive: true,
+            scales: {
+                x: { display: false },
+                y: {
+                    title: { display: !!yLabel, text: yLabel || "", font: { size: 10 } },
+                    min: yMin !== undefined ? yMin : undefined,
+                    max: yMax !== undefined ? yMax : undefined,
+                    ticks: { font: { size: 10 } }
+                }
+            },
+            plugins: {
+                legend: { display: datasets.length > 1, position: "top",
+                          labels: { boxWidth: 10, font: { size: 10 } } }
+            },
+            elements: { point: { radius: 0 } }
+        }
+    });
+}
+
+const chartReward = makeLineChart("chart-reward", [
+    { label: "Total Reward", data: [],
+      borderColor: "#1a6fc4", backgroundColor: "rgba(26,111,196,.08)",
+      borderWidth: 1.5, fill: true, tension: .3 },
+    { label: "Rolling Avg", data: [],
+      borderColor: "#5b9bd5", borderWidth: 2, tension: .4, borderDash: [4,2] }
+]);
+
+const chartEps = makeLineChart("chart-eps", [
+    { label: "Epsilon", data: [],
+      borderColor: "#2e8fd6", backgroundColor: "rgba(46,143,214,.1)",
+      borderWidth: 1.5, fill: true, tension: .2 }
+], "epsilon", 0, 1);
+
+const chartGrid = makeLineChart("chart-grid", [
+    { label: "Grid kWh", data: [],
+      borderColor: "#1a4b8c", backgroundColor: "rgba(26,75,140,.07)",
+      borderWidth: 1.5, fill: true, tension: .3 }
+], "kWh");
+
+const chartQ = makeLineChart("chart-q", [
+    { label: "Solar Q-mean", data: [],
+      borderColor: "#1a6fc4", borderWidth: 1.5, tension: .3 },
+    { label: "Wind Q-mean", data: [],
+      borderColor: "#5b9bd5", borderWidth: 1.5, tension: .3, borderDash: [4,2] }
+]);
+
+const chartSoc = makeLineChart("chart-soc", [
+    { label: "Avg SoC %", data: [],
+      borderColor: "#2e8fd6", backgroundColor: "rgba(46,143,214,.1)",
+      borderWidth: 1.5, fill: true, tension: .3 }
+], "%", 0, 100);
+
+function makeStratChart(id) {
+    return new Chart($(id).getContext("2d"), {
+        type: "line",
+        data: {
+            labels: [],
+            datasets: [
+                { label: "Honest",    data: [], borderColor: "#1a6fc4",
+                  backgroundColor: "rgba(26,111,196,.25)", borderWidth: 1.5, fill: "origin", tension: .3 },
+                { label: "Hide",      data: [], borderColor: "#f0a500",
+                  backgroundColor: "rgba(240,165,0,.2)",   borderWidth: 1.5, fill: "origin", tension: .3 },
+                { label: "Deception", data: [], borderColor: "#d93b3b",
+                  backgroundColor: "rgba(217,59,59,.2)",   borderWidth: 1.5, fill: "origin", tension: .3 }
+            ]
+        },
+        options: {
+            animation: false,
+            responsive: true,
+            scales: {
+                x: { display: false },
+                y: { min: 0, max: 100, title: { display: true, text: "%", font: { size: 10 } },
+                     ticks: { font: { size: 10 } } }
+            },
+            plugins: { legend: { display: true, position: "top",
+                                 labels: { boxWidth: 10, font: { size: 10 } } } },
+            elements: { point: { radius: 0 } }
+        }
+    });
+}
+
+const chartSolarStrat = makeStratChart("chart-solar-strat");
+const chartWindStrat  = makeStratChart("chart-wind-strat");
+
+// ── Helpers ─────────────────────────────────────────────────
+function pushAll(chartsVals) {
+    chartsVals.forEach(([chart, ...vals]) => {
+        vals.forEach((v, i) => chart.data.datasets[i].data.push(v));
+        if (chart.data.labels.length > MAX_CHART_PTS) {
+            chart.data.labels.shift();
+            chart.data.datasets.forEach(ds => ds.data.shift());
+        }
+    });
+}
+
+function pushLabel(chart, label) {
+    chart.data.labels.push(label);
+    if (chart.data.labels.length > MAX_CHART_PTS)
+        chart.data.labels.shift();
+}
+
+function updateAllCharts(msg) {
+    const ep = msg.episode;
+    const sc = msg.solar_counts || {};
+    const wc = msg.wind_counts  || {};
+
+    const sH = sc.honest           || 0;
+    const sI = sc.hide_information || 0;
+    const sD = sc.deception        || 0;
+    const wH = wc.honest           || 0;
+    const wI = wc.hide_information || 0;
+    const wD = wc.deception        || 0;
+
+    [chartReward, chartEps, chartGrid, chartQ, chartSoc,
+     chartSolarStrat, chartWindStrat].forEach(c => pushLabel(c, ep));
+
+    pushAll([
+        [chartReward, msg.total_reward, msg.rolling_avg],
+        [chartEps,    msg.epsilon],
+        [chartGrid,   msg.grid_kwh],
+        [chartQ,      msg.q_mean_solar, msg.q_mean_wind],
+        [chartSoc,    msg.avg_soc],
+        [chartSolarStrat, sH, sI, sD],
+        [chartWindStrat,  wH, wI, wD]
+    ]);
+
+    const mColor = MODE_CFG[currentMode].color;
+    chartReward.data.datasets[0].borderColor = mColor;
+    chartReward.data.datasets[0].backgroundColor = mColor + "15";
+
+    [chartReward, chartEps, chartGrid, chartQ, chartSoc,
+     chartSolarStrat, chartWindStrat].forEach(c => c.update("none"));
+}
+
+function updateStratBars(prefix, counts) {
+    const h = counts.honest           || 0;
+    const i = counts.hide_information || 0;
+    const d = counts.deception        || 0;
+
+    $(prefix + "-bar-honest").style.width    = h + "%";
+    $(prefix + "-bar-hide").style.width      = i + "%";
+    $(prefix + "-bar-deception").style.width = d + "%";
+
+    $(prefix + "-pct-honest").textContent    = h.toFixed(0);
+    $(prefix + "-pct-hide").textContent      = i.toFixed(0);
+    $(prefix + "-pct-deception").textContent = d.toFixed(0);
+}
+
+function updateKPIs(msg) {
+    const sign = msg.total_reward >= 0 ? "+" : "";
+    $("kpi-reward").textContent  = sign + msg.total_reward.toFixed(0);
+    $("kpi-rolling").textContent = msg.rolling_avg.toFixed(1);
+    $("kpi-grid").textContent    = msg.grid_kwh.toFixed(0);
+    $("kpi-soc").textContent     = msg.avg_soc.toFixed(1);
+    $("kpi-qsolar").textContent  = msg.q_mean_solar.toFixed(4);
+    $("kpi-qwind").textContent   = msg.q_mean_wind.toFixed(4);
+
+    const rewardColor = msg.total_reward >= 0 ? "#1ea87a" : "#d93b3b";
+    $("kpi-reward").style.color = rewardColor;
+}
+
+function updateProgress(msg) {
+    $("prog-ep").textContent      = msg.episode;
+    $("prog-total").textContent   = msg.n_episodes;
+    $("prog-elapsed").textContent = msg.total_elapsed_s;
+    $("prog-eps").textContent     = msg.epsilon.toFixed(4);
+    $("prog-bar").style.width     = msg.progress + "%";
+
+    if (msg.episode > 1 && msg.total_elapsed_s > 0) {
+        const secPerEp  = msg.total_elapsed_s / msg.episode;
+        const remaining = (msg.n_episodes - msg.episode) * secPerEp;
+        $("prog-eta").textContent = remaining > 0
+            ? Math.ceil(remaining) + " s"
+            : "done";
+    }
+}
+
+function stratBadge(strat) {
+    const cfg = STRAT_COLORS[strat] || { bg: "#5b9bd5", label: strat };
+    return `<span class="badge" style="background:${cfg.bg}">${cfg.label}</span>`;
+}
+
+function addLogRow(msg) {
+    const sign = msg.total_reward >= 0 ? "+" : "";
+    const rewardColor = msg.total_reward >= 0 ? "#1ea87a" : "#d93b3b";
+    const row = `
+        <tr>
+            <td>${msg.episode}</td>
+            <td style="color:${rewardColor};font-weight:600">${sign}${msg.total_reward.toFixed(0)}</td>
+            <td>${msg.rolling_avg.toFixed(1)}</td>
+            <td>${msg.epsilon.toFixed(4)}</td>
+            <td>${msg.grid_kwh.toFixed(0)}</td>
+            <td>${msg.avg_soc.toFixed(1)}</td>
+            <td>${stratBadge(msg.solar_dominant)}</td>
+            <td>${stratBadge(msg.wind_dominant)}</td>
+            <td>${msg.ep_elapsed_s.toFixed(2)}</td>
+        </tr>`;
+    logRows.unshift(row);
+    if (logRows.length > MAX_LOG_ROWS) logRows.pop();
+    $("ep-log-body").innerHTML = logRows.join("");
+}
+
+function setStatus(text, active) {
+    $("status-text").textContent = text;
+    $("status-dot").style.background = active ? "#3ecf8e" : "#6e84a3";
+}
+
+function resetPanel() {
+    if (es) { es.close(); es = null; }
+
+    logRows = [];
+    $("ep-log-body").innerHTML = "";
+
+    [chartReward, chartEps, chartGrid, chartQ, chartSoc,
+     chartSolarStrat, chartWindStrat].forEach(c => {
+        c.data.labels = [];
+        c.data.datasets.forEach(ds => ds.data = []);
+        c.update("none");
+    });
+
+    ["kpi-reward","kpi-rolling","kpi-grid","kpi-soc",
+     "kpi-qsolar","kpi-qwind"].forEach(id => $(id).textContent = "—");
+    $("kpi-reward").style.color = "";
+
+    $("prog-ep").textContent      = "0";
+    $("prog-total").textContent   = "—";
+    $("prog-elapsed").textContent = "0";
+    $("prog-eps").textContent     = "1.0000";
+    $("prog-eta").textContent     = "—";
+    $("prog-bar").style.width     = "0";
+    $("prog-bar").classList.add("progress-bar-striped","progress-bar-animated");
+
+    ["solar","wind"].forEach(p => {
+        $(p + "-dom-badge").textContent = "—";
+        $(p + "-dom-badge").style.background = "#1a6fc4";
+        updateStratBars(p, { honest: 33, hide_information: 33, deception: 34 });
+        [p + "-pct-honest", p + "-pct-hide", p + "-pct-deception"]
+            .forEach(id => $(id).textContent = "—");
+    });
+
+    const btn = $("btn-run");
+    btn.disabled    = false;
+    btn.textContent = "Run Training";
+    setStatus("Idle", false);
+    selectMode(currentMode);
+}
+
+// ── Start training — SSE (Flask /train/<mode>) ───────────────
+function startTraining() {
+    resetPanel();
+
+    const n    = $("ep-slider").value;
+    const save = $("chk-save").checked ? "1" : "0";
+    const url  = `/train/${currentMode}?n_episodes=${n}&save=${save}`;
+
+    const btn = $("btn-run");
+    btn.disabled    = true;
+    btn.textContent = "Training...";
+    setStatus("Running", true);
+
+    es = new EventSource(url);
+
+    es.onmessage = function(e) {
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === "train_init") {
+            $("prog-total").textContent = msg.n_episodes;
+
+        } else if (msg.type === "train_episode") {
+            updateProgress(msg);
+            updateKPIs(msg);
+            updateAllCharts(msg);
+            updateStratBars("solar", msg.solar_counts || {});
+            updateStratBars("wind",  msg.wind_counts  || {});
+
+            ["solar","wind"].forEach(agent => {
+                const dom = msg[agent + "_dominant"];
+                const el  = $(agent + "-dom-badge");
+                const cfg = STRAT_COLORS[dom] || { bg: "#1a6fc4", label: dom };
+                el.textContent = cfg.label;
+                el.style.background = cfg.bg;
+                el.className = "badge";
+            });
+
+            addLogRow(msg);
+
+        } else if (msg.type === "train_done") {
+            $("prog-bar").classList.remove("progress-bar-striped","progress-bar-animated");
+            $("prog-bar").style.width = "100%";
+            $("prog-eta").textContent = "done";
+            setStatus("Done", false);
+            btn.disabled    = false;
+            btn.textContent = "▶ Run Again";
+            selectMode(currentMode);
+            es.close();
+            es = null;
+        }
+    };
+
+    es.onerror = function() {
+        btn.disabled    = false;
+        btn.textContent = "▶ Run Training";
+        setStatus("Error", false);
+        selectMode(currentMode);
+        if (es) { es.close(); es = null; }
+    };
+}
+
+// ── Prefect flow launcher ───────────────────────────────────
+async function runPrefectFlow() {
+    const btn = $("btn-prefect");
+    btn.disabled    = true;
+    btn.textContent = "Launching…";
+
+    const toast = $("prefect-toast");
+    const msg   = $("prefect-toast-msg");
+    const link  = $("prefect-toast-link");
+
+    toast.style.display = "block";
+    msg.textContent = `Starting ${currentMode} evaluation flow…`;
+
+    try {
+        const res  = await fetch(`/run-flow/${currentMode}`);
+        const data = await res.json();
+
+        const uiUrl = data.flows_url || data.prefect_ui + "/runs";
+        link.href = uiUrl;
+        msg.innerHTML = `<strong>${currentMode}</strong> flow launched.<br>
+            Track it in the Prefect dashboard.`;
+
+    } catch (err) {
+        msg.textContent = "Could not reach the server. Is Flask running?";
+    }
+
+    btn.disabled    = false;
+    btn.textContent = "Run as Prefect Flow";
+
+    // Auto-hide toast after 12 s
+    setTimeout(() => { toast.style.display = "none"; }, 12000);
+}
+</script>
+
+{% endblock %}
