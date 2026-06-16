@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Microgrid Real-time Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; color: #222; }
+
+    header {
+      background: #1e3a5f; color: white; padding: 14px 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    header h1 { font-size: 18px; white-space: nowrap; }
+    header .sub { font-size: 11px; opacity: .7; margin-top: 3px; }
+
+    .status-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .badge {
+      border-radius: 12px; font-size: 11px; padding: 3px 10px;
+      font-weight: bold; white-space: nowrap;
+    }
+    .badge.blue  { background: #4f9eff; color: white; }
+    .badge.green { background: #1a7f3c; color: white; }
+    .badge.red   { background: #c0392b; color: white; }
+    .badge.gray  { background: #555; color: white; }
+    #countdown   { font-size: 11px; opacity: .65; color: white; }
+    #dot { width:8px; height:8px; border-radius:50%; background:#1a7f3c;
+           display:inline-block; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    main { max-width: 1400px; margin: 20px auto; padding: 0 18px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+    .card {
+      background: white; border-radius: 10px; padding: 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+    .card h3 { font-size: 13px; color: #1e3a5f; margin-bottom: 12px; font-weight: bold; }
+    canvas { max-height: 260px; width: 100% !important; }
+    #prices-canvas { max-height: 200px; }
+
+    h2 {
+      font-size: 15px; color: #1e3a5f; margin-bottom: 10px;
+      border-left: 4px solid #4f9eff; padding-left: 9px;
+    }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 12px;
+      background: white; border-radius: 8px; overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    }
+    thead { background: #1e3a5f; color: white; }
+    th, td { padding: 7px 11px; text-align: left; }
+    tbody tr:nth-child(even) { background: #f7f9fc; }
+    .best-val { color: #1a7f3c; font-weight: bold; }
+    .empty { color: #999; font-style: italic; font-size: 13px; padding: 8px 0; }
+    .note { font-size: 11px; color: #888; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Microgrid Multi-Agent Optimization</h1>
+    <div class="sub">NSGA-II &amp; SPEA2 · Sliding 24-hour window · Optuna best params</div>
+  </div>
+  <div class="status-bar">
+    <span id="dot"></span>
+    <span id="badge-window" class="badge blue">Window —</span>
+    <span id="badge-runs"   class="badge green">Runs: 0</span>
+    <span id="badge-last"   class="badge gray">Last run: —</span>
+    <span id="badge-time"   class="badge gray">Duration: —</span>
+    <span id="countdown">Refresh in 15s</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Row 1: Pareto scatter + Execution times bar -->
+  <div class="grid-2">
+    <div class="card">
+      <h3>Pareto Fronts — Current Window (Economic Cost vs Grid Energy)</h3>
+      <canvas id="pareto-canvas"></canvas>
+    </div>
+    <div class="card">
+      <h3>Algorithm Execution Times per Run (seconds)</h3>
+      <canvas id="times-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 2: Predictions -->
+  <div class="grid-2">
+    <div class="card">
+      <h3>Wind Power Predictions (kWh/h)</h3>
+      <canvas id="wind-canvas"></canvas>
+    </div>
+    <div class="card">
+      <h3>Solar Power Predictions (kWh/h)</h3>
+      <canvas id="solar-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 3: Agent prices (full width) -->
+  <div class="card" style="margin-bottom:18px;">
+    <h3>Agent Prices (EUR/MWh) — Wind &amp; Solar</h3>
+    <canvas id="prices-canvas"></canvas>
+  </div>
+
+  <!-- Row 4: Tables -->
+  <div class="grid-2" style="align-items:start;">
+    <div>
+      <h2>Optimization Studies (Optuna)</h2>
+      <div id="studies-table"><p class="empty">Loading…</p></div>
+    </div>
+    <div>
+      <h2>Algorithm Quality Metrics</h2>
+      <div id="metrics-table"><p class="empty">Loading…</p></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// Chart instances
+// ---------------------------------------------------------------------------
+let paretoChart, timesChart, windChart, solarChart, pricesChart;
+const COLORS = { NSGAII: 'rgba(79,158,255,0.85)', SPEA2: 'rgba(255,127,14,0.85)' };
+const REFRESH_MS = 15000;
+let countdown = REFRESH_MS / 1000;
+
+// ---------------------------------------------------------------------------
+// Fetch helper
+// ---------------------------------------------------------------------------
+async function get(url) {
+  try {
+    const r = await fetch(url);
+    return r.ok ? r.json() : null;
+  } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------
+// Chart factory helpers
+// ---------------------------------------------------------------------------
+function scatter(id) {
+  return new Chart(document.getElementById(id), {
+    type: 'scatter',
+    data: { datasets: [] },
+    options: {
+      animation: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      scales: {
+        x: { title: { display: true, text: 'Economic Cost (€)', font: { size: 11 } } },
+        y: { title: { display: true, text: 'Grid Energy (kWh)', font: { size: 11 } } },
+      }
+    }
+  });
+}
+
+function bar(id, yLabel) {
+  return new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'NSGA-II', data: [], backgroundColor: COLORS.NSGAII },
+        { label: 'SPEA2',   data: [], backgroundColor: COLORS.SPEA2  },
+      ]
+    },
+    options: {
+      animation: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } } },
+        y: { title: { display: true, text: yLabel, font: { size: 11 } }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function line(id, yLabel, datasets) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels: [], datasets },
+    options: {
+      animation: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+      elements: { point: { radius: 0 } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, font: { size: 9 } } },
+        y: { title: { display: true, text: yLabel, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Init charts on load
+// ---------------------------------------------------------------------------
+window.addEventListener('load', () => {
+  paretoChart = scatter('pareto-canvas');
+
+  timesChart = bar('times-canvas', 'Seconds');
+
+  windChart = line('wind-canvas', 'kWh/h', [
+    { label: 'Wind prediction', data: [],
+      borderColor: '#4f9eff', backgroundColor: 'rgba(79,158,255,.1)',
+      fill: true, tension: 0.3, borderWidth: 1.5 }
+  ]);
+
+  solarChart = line('solar-canvas', 'kWh/h', [
+    { label: 'Solar prediction', data: [],
+      borderColor: '#f6c90e', backgroundColor: 'rgba(246,201,14,.1)',
+      fill: true, tension: 0.3, borderWidth: 1.5 }
+  ]);
+
+  pricesChart = line('prices-canvas', 'EUR/MWh', [
+    { label: 'Wind (€/MWh)',  data: [], borderColor: '#4f9eff', tension: 0.3, borderWidth: 1.5 },
+    { label: 'Solar (€/MWh)', data: [], borderColor: '#f6c90e', tension: 0.3, borderWidth: 1.5 },
+  ]);
+
+  refreshAll();
+  setInterval(refreshAll, REFRESH_MS);
+  setInterval(() => {
+    countdown = Math.max(0, countdown - 1);
+    document.getElementById('countdown').textContent = `Refresh in ${countdown}s`;
+  }, 1000);
+});
+
+// ---------------------------------------------------------------------------
+// Main refresh cycle
+// ---------------------------------------------------------------------------
+async function refreshAll() {
+  countdown = REFRESH_MS / 1000;
+
+  const [status, pareto, times, wind, solar, priceWind, priceSolar, studies, metrics] =
+    await Promise.all([
+      get('/api/status'),
+      get('/api/results/pareto-data'),
+      get('/api/results/execution-times'),
+      get('/api/results/predicciones/wind?n=120'),
+      get('/api/results/predicciones/solar?n=120'),
+      get('/api/results/precios/wind?n=120'),
+      get('/api/results/precios/solar?n=120'),
+      get('/api/optuna/studies'),
+      get('/api/results/metrics'),
+    ]);
+
+  updateStatus(status);
+  updatePareto(pareto);
+  updateTimes(times);
+  updatePrediction(windChart,  wind,  wind?.prediction_col);
+  updatePrediction(solarChart, solar, solar?.prediction_col);
+  updatePrices(priceWind, priceSolar);
+  renderStudies(studies);
+  renderMetrics(metrics);
+}
+
+// ---------------------------------------------------------------------------
+// Status bar
+// ---------------------------------------------------------------------------
+function updateStatus(s) {
+  if (!s) return;
+  const sh = s.last_start_hour ?? 0;
+  document.getElementById('badge-window').textContent = `Window h${sh}–h${sh + 24}`;
+  document.getElementById('badge-runs').textContent   = `Runs: ${s.runs_completed ?? 0}`;
+  if (s.last_run) {
+    const t = new Date(s.last_run);
+    document.getElementById('badge-last').textContent = `Last: ${t.toLocaleTimeString()}`;
+  }
+  if (s.last_elapsed_s != null) {
+    document.getElementById('badge-time').textContent = `Duration: ${s.last_elapsed_s}s`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pareto scatter
+// ---------------------------------------------------------------------------
+function updatePareto(data) {
+  if (!data || !data.fronts) return;
+  paretoChart.data.datasets = Object.entries(data.fronts).map(([algo, pts]) => ({
+    label: algo,
+    data:  pts.map(p => ({ x: +p[0].toFixed(1), y: +p[1].toFixed(1) })),
+    backgroundColor: COLORS[algo] ?? '#999',
+    pointRadius: 5,
+  }));
+  paretoChart.update('none');
+}
+
+// ---------------------------------------------------------------------------
+// Execution times bar
+// ---------------------------------------------------------------------------
+function updateTimes(data) {
+  if (!data || !data.length) return;
+  const last = data.slice(-12);
+  timesChart.data.labels = last.map((d, i) => {
+    const n = data.length - last.length + i + 1;
+    return `#${n} h${d.window_start_hour ?? 0}`;
+  });
+  timesChart.data.datasets[0].data = last.map(d => +(d.NSGAII ?? 0).toFixed(1));
+  timesChart.data.datasets[1].data = last.map(d => +(d.SPEA2  ?? 0).toFixed(1));
+  timesChart.update('none');
+}
+
+// ---------------------------------------------------------------------------
+// Prediction line charts
+// ---------------------------------------------------------------------------
+function updatePrediction(chart, data, predCol) {
+  if (!data || !data.data || !data.data.length || !predCol) return;
+  const rows   = data.data;
+  const labels = rows.map((r, i) => r.Date ? String(r.Date).slice(5, 16) : String(i));
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = rows.map(r => r[predCol] ?? null);
+  chart.update('none');
+}
+
+// ---------------------------------------------------------------------------
+// Prices line chart
+// ---------------------------------------------------------------------------
+function updatePrices(wind, solar) {
+  if (!wind || !wind.data) return;
+  const rows = wind.data;
+  const labels = rows.map((_, i) => String(i + 1));
+  pricesChart.data.labels = labels;
+  pricesChart.data.datasets[0].data = rows.map(r => r['precio_eur_mwh'] ?? null);
+  if (solar && solar.data) {
+    pricesChart.data.datasets[1].data = solar.data.map(r => r['precio_eur_mwh'] ?? null);
+  }
+  pricesChart.update('none');
+}
+
+// ---------------------------------------------------------------------------
+// Studies table
+// ---------------------------------------------------------------------------
+function renderStudies(studies) {
+  const el = document.getElementById('studies-table');
+  if (!studies || !studies.length) {
+    el.innerHTML = '<p class="empty">No studies registered yet.</p>';
+    return;
+  }
+  const rows = studies.map(s => `
+    <tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.n_trials}</td>
+      <td>${s.hypervolume != null ? s.hypervolume.toFixed(6) : '—'}</td>
+      <td style="color:#aaa;font-size:11px;">${s.start_date ? s.start_date.slice(0,19) : '—'}</td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Study</th><th>Trials</th><th>HV (norm.)</th><th>Started</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ---------------------------------------------------------------------------
+// Metrics table
+// ---------------------------------------------------------------------------
+function renderMetrics(metrics) {
+  const el = document.getElementById('metrics-table');
+  if (!metrics || !Object.keys(metrics).length) {
+    el.innerHTML = '<p class="empty">No metrics file found (metricas_calidad.json).</p>';
+    return;
+  }
+  const vals = Object.values(metrics);
+  const bestHV     = Math.max(...vals.map(m => m.HV_normalizado ?? -Infinity));
+  const bestGD     = Math.min(...vals.map(m => m.GD     ?? Infinity));
+  const bestIGD    = Math.min(...vals.map(m => m.IGD    ?? Infinity));
+  const bestSpread = Math.min(...vals.map(m => m.Spread ?? Infinity));
+
+  const rows = Object.entries(metrics).map(([algo, m]) => `
+    <tr>
+      <td><strong>${algo}</strong></td>
+      <td class="${m.HV_normalizado === bestHV ? 'best-val' : ''}">
+        ${m.HV_normalizado != null ? m.HV_normalizado.toFixed(6) : '—'}</td>
+      <td class="${m.GD === bestGD ? 'best-val' : ''}">
+        ${m.GD != null ? m.GD.toFixed(4) : '—'}</td>
+      <td class="${m.IGD === bestIGD ? 'best-val' : ''}">
+        ${m.IGD != null ? m.IGD.toFixed(4) : '—'}</td>
+      <td class="${m.Spread === bestSpread ? 'best-val' : ''}">
+        ${m.Spread != null ? m.Spread.toFixed(4) : '—'}</td>
+      <td>${m.n_soluciones ?? '—'}</td>
+      <td>${m.elapsed_s != null ? m.elapsed_s.toFixed(1) : '—'}</td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Algorithm</th><th>HV↑</th><th>GD↓</th><th>IGD↓</th>
+            <th>Spread↓</th><th>Solutions</th><th>Time(s)</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="note"><span style="color:#1a7f3c;font-weight:bold;">Green</span>
+      = best value per metric (HV↑ · GD↓ · IGD↓ · Spread↓)</p>`;
+}
+</script>
+</body>
+</html>
