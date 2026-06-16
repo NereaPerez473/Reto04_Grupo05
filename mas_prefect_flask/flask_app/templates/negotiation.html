@@ -9,22 +9,42 @@ Negotiation Mode
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+<!-- Paleta azul / naranja -->
+<style>
+    .bg-nego-blue     { background-color: #0d6efd !important; }
+    .bg-nego-orange   { background-color: #fd7e14 !important; }
+    .border-nego-blue   { border-color: #0d6efd !important; }
+    .border-nego-orange { border-color: #fd7e14 !important; }
+    .text-nego-blue   { color: #0d6efd !important; }
+    .text-nego-orange { color: #fd7e14 !important; }
+
+    .btn-nego-orange {
+        background-color: #fd7e14;
+        border-color: #fd7e14;
+        color: #fff;
+    }
+    .btn-nego-orange:hover,
+    .btn-nego-orange:focus {
+        background-color: #e8690b;
+        border-color: #e8690b;
+        color: #fff;
+    }
+
+    .badge.bg-nego-orange { color: #fff; }
+</style>
+
 <div class="container-fluid">
 
     <h1 class="page-title">Negotiation Mode Analysis</h1>
-
-    <div class="alert alert-danger">
-        Strategic behaviour learned through Q-Learning — live simulation panel.
-    </div>
 
     <!-- ================================================== -->
     <!-- PANEL DE CONTROL                                   -->
     <!-- ================================================== -->
 
-    <div class="card mb-4 border-danger">
+    <div class="card mb-4 border-nego-blue">
 
-        <div class="card-header bg-danger text-white">
-            <h4 class="mb-0">⚡ Live Simulation Control</h4>
+        <div class="card-header bg-nego-blue text-white">
+            <h4 class="mb-0">Live Simulation Control</h4>
         </div>
 
         <div class="card-body">
@@ -34,10 +54,8 @@ Negotiation Mode
                 <!-- Selector de modo -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold">Agent Mode</label>
-                    <select id="sel-mode" class="form-select">
+                    <select id="sel-mode" class="form-select" disabled>
                         <option value="negotiation" selected>Negotiation</option>
-                        <option value="competitive">Competitive</option>
-                        <option value="cooperative">Cooperative</option>
                     </select>
                 </div>
 
@@ -58,14 +76,14 @@ Negotiation Mode
                 <div class="col-md-5 d-flex gap-2">
                     <button
                         id="btn-run"
-                        class="btn btn-danger fw-bold flex-grow-1"
+                        class="btn btn-nego-orange fw-bold flex-grow-1"
                         onclick="startStream()">
-                        ▶ Run Simulation
+                        Run Simulation
                     </button>
                     <button
                         class="btn btn-outline-secondary"
                         onclick="resetPanel()">
-                        ↺ Reset
+                        Reset
                     </button>
                 </div>
 
@@ -79,12 +97,12 @@ Negotiation Mode
                 </div>
                 <div class="progress mb-1" style="height:8px">
                     <div id="ep-bar"
-                         class="progress-bar bg-dark"
+                         class="progress-bar bg-nego-blue"
                          style="width:0"></div>
                 </div>
                 <div class="progress" style="height:6px">
                     <div id="step-bar"
-                         class="progress-bar progress-bar-striped progress-bar-animated bg-danger"
+                         class="progress-bar progress-bar-striped progress-bar-animated bg-nego-orange"
                          style="width:0"></div>
                 </div>
             </div>
@@ -165,7 +183,7 @@ Negotiation Mode
         <div class="col-lg-6">
             <div class="card graph-card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">🔋 Battery SoC — live</h5>
+                    <h5 class="mb-0">Battery SoC — live</h5>
                 </div>
                 <div class="card-body">
                     <canvas id="chart-soc" height="180"></canvas>
@@ -177,7 +195,7 @@ Negotiation Mode
         <div class="col-lg-6">
             <div class="card graph-card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">⚡ Grid vs Renewable — accumulated</h5>
+                    <h5 class="mb-0">Grid vs Renewable — accumulated</h5>
                 </div>
                 <div class="card-body">
                     <canvas id="chart-energy" height="180"></canvas>
@@ -193,7 +211,7 @@ Negotiation Mode
         <div class="col-lg-4">
             <div class="card graph-card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">☀ Solar Strategy Distribution</h5>
+                    <h5 class="mb-0">Solar Strategy Distribution</h5>
                 </div>
                 <div class="card-body d-flex align-items-center justify-content-center">
                     <canvas id="chart-solar-strat" height="200"></canvas>
@@ -205,7 +223,7 @@ Negotiation Mode
         <div class="col-lg-4">
             <div class="card graph-card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">💨 Wind Strategy Distribution</h5>
+                    <h5 class="mb-0">Wind Strategy Distribution</h5>
                 </div>
                 <div class="card-body d-flex align-items-center justify-content-center">
                     <canvas id="chart-wind-strat" height="200"></canvas>
@@ -217,7 +235,7 @@ Negotiation Mode
         <div class="col-lg-4">
             <div class="card graph-card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">🌿 Renewable Share per Episode</h5>
+                    <h5 class="mb-0">Renewable Share per Episode</h5>
                 </div>
                 <div class="card-body">
                     <canvas id="chart-share" height="200"></canvas>
@@ -235,9 +253,9 @@ Negotiation Mode
 
         <!-- Solar agent -->
         <div class="col-md-6">
-            <div class="card border-warning h-100">
-                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                    <strong>☀ Solar Agent</strong>
+            <div class="card border-nego-orange h-100">
+                <div class="card-header bg-nego-orange text-white d-flex justify-content-between align-items-center">
+                    <strong>Solar Agent</strong>
                     <span id="live-solar-badge" class="badge bg-secondary fs-6">—</span>
                 </div>
                 <div class="card-body">
@@ -257,9 +275,9 @@ Negotiation Mode
 
         <!-- Wind agent -->
         <div class="col-md-6">
-            <div class="card border-info h-100">
-                <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
-                    <strong>💨 Wind Agent</strong>
+            <div class="card border-nego-blue h-100">
+                <div class="card-header bg-nego-blue text-white d-flex justify-content-between align-items-center">
+                    <strong>Wind Agent</strong>
                     <span id="live-wind-badge" class="badge bg-secondary fs-6">—</span>
                 </div>
                 <div class="card-body">
@@ -282,7 +300,7 @@ Negotiation Mode
     <!-- Negotiation log tabla -->
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">📋 Negotiation Event Log</h5>
+            <h5 class="mb-0">Negotiation Event Log</h5>
             <small class="text-muted">Last 30 events</small>
         </div>
         <div class="card-body p-0" style="max-height:260px; overflow-y:auto;">
@@ -293,10 +311,10 @@ Negotiation Mode
                         <th>Step</th>
                         <th>Demand kW</th>
                         <th>Price €/kWh</th>
-                        <th>☀ Strategy</th>
-                        <th>☀ Energy kW</th>
-                        <th>💨 Strategy</th>
-                        <th>💨 Energy kW</th>
+                        <th>Solar Strategy</th>
+                        <th>Solar Energy kW</th>
+                        <th>Wind Strategy</th>
+                        <th>Wind Energy kW</th>
                         <th>SoC %</th>
                     </tr>
                 </thead>
@@ -310,8 +328,8 @@ Negotiation Mode
     <!-- ================================================== -->
 
     <div class="card mb-4" id="ep-results-card" style="display:none">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0">✅ Episode Results</h5>
+        <div class="card-header bg-nego-blue text-white">
+            <h5 class="mb-0">Episode Results</h5>
         </div>
         <div class="card-body p-0">
             <table class="table table-striped mb-0" id="ep-results-table">
@@ -334,50 +352,6 @@ Negotiation Mode
         </div>
     </div>
 
-    <!-- ================================================== -->
-    <!-- PLOTS ESTÁTICOS                                    -->
-    <!-- ================================================== -->
-
-    <div class="row g-4 mt-2">
-
-        <div class="col-lg-6">
-            <div class="card graph-card">
-                <div class="card-header"><h5>Solar Strategy Evolution (training)</h5></div>
-                <div class="card-body">
-                    <img src="/plot/05_strategies_solar.png" class="img-fluid">
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card graph-card">
-                <div class="card-header"><h5>Wind Strategy Evolution (training)</h5></div>
-                <div class="card-body">
-                    <img src="/plot/06_strategies_wind.png" class="img-fluid">
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card graph-card">
-                <div class="card-header"><h5>Solar Negotiation Heatmap</h5></div>
-                <div class="card-body">
-                    <img src="/plot/09_heatmap_solar_nego.png" class="img-fluid">
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card graph-card">
-                <div class="card-header"><h5>Wind Negotiation Heatmap</h5></div>
-                <div class="card-body">
-                    <img src="/plot/12_heatmap_wind_nego.png" class="img-fluid">
-                </div>
-            </div>
-        </div>
-
-    </div>
-
     <!-- Tabla de estrategias -->
     <div class="card mt-4">
         <div class="card-header"><h5>Negotiation Strategies Reference</h5></div>
@@ -390,17 +364,17 @@ Negotiation Mode
                 </thead>
                 <tbody>
                     <tr>
-                        <td><span class="badge bg-success">Honest</span></td>
+                        <td><span class="badge bg-nego-blue">Honest</span></td>
                         <td>Truthful declaration</td>
                         <td>Real production and competitive pricing.</td>
                     </tr>
                     <tr>
-                        <td><span class="badge bg-warning text-dark">Hide Information</span></td>
+                        <td><span class="badge bg-nego-orange">Hide Information</span></td>
                         <td>Under-reporting</td>
                         <td>Declares less energy than available.</td>
                     </tr>
                     <tr>
-                        <td><span class="badge bg-danger">Deception</span></td>
+                        <td><span class="badge bg-secondary">Deception</span></td>
                         <td>Over-reporting</td>
                         <td>Declares more energy than available.</td>
                     </tr>
@@ -419,9 +393,9 @@ Negotiation Mode
 // ── Constantes ──────────────────────────────────────────
 
 const STRAT_COLOR = {
-    "honest":           { badge: "success",          chart: "rgba(25,135,84,0.85)"  },
-    "hide_information": { badge: "warning text-dark", chart: "rgba(255,193,7,0.85)" },
-    "deception":        { badge: "danger",            chart: "rgba(220,53,69,0.85)" }
+    "honest":           { badge: "nego-blue",   chart: "rgba(13,110,253,0.85)"  },
+    "hide_information": { badge: "nego-orange", chart: "rgba(253,126,20,0.85)" },
+    "deception":        { badge: "secondary",   chart: "rgba(108,117,125,0.85)" }
 };
 
 const MAX_SOC_POINTS  = 100;   // puntos máx en gráfica SoC
@@ -480,7 +454,7 @@ const chartEnergy = new Chart(ctxEnergy, {
             {
                 label: "Grid kWh",
                 data: [],
-                borderColor: "rgba(220,53,69,0.9)",
+                borderColor: "rgba(253,126,20,0.9)",
                 borderWidth: 1.5,
                 pointRadius: 0,
                 tension: 0.3
@@ -488,7 +462,7 @@ const chartEnergy = new Chart(ctxEnergy, {
             {
                 label: "Renewable kWh",
                 data: [],
-                borderColor: "rgba(25,135,84,0.9)",
+                borderColor: "rgba(13,110,253,0.9)",
                 borderWidth: 1.5,
                 pointRadius: 0,
                 tension: 0.3
@@ -508,9 +482,9 @@ const chartEnergy = new Chart(ctxEnergy, {
 const STRAT_LABELS = ["Honest", "Hide Info", "Deception"];
 const STRAT_KEYS   = ["honest", "hide_information", "deception"];
 const STRAT_BG     = [
-    "rgba(25,135,84,0.85)",
-    "rgba(255,193,7,0.85)",
-    "rgba(220,53,69,0.85)"
+    "rgba(13,110,253,0.85)",
+    "rgba(253,126,20,0.85)",
+    "rgba(108,117,125,0.85)"
 ];
 
 const chartSolarStrat = new Chart(ctxSolar, {
@@ -544,7 +518,7 @@ const chartShare = new Chart(ctxShare, {
         datasets: [{
             label: "Renewable Share %",
             data: [],
-            backgroundColor: "rgba(25,135,84,0.75)",
+            backgroundColor: "rgba(13,110,253,0.75)",
             borderRadius: 4
         }]
     },
@@ -674,7 +648,7 @@ function resetPanel() {
 
     const btn = document.getElementById("btn-run");
     btn.disabled = false;
-    btn.textContent = "▶ Run Simulation";
+    btn.textContent = "Run Simulation";
 }
 
 function setProgress(epCurrent, epTotal, stepPct, stepAnimated) {
@@ -694,6 +668,49 @@ function setProgress(epCurrent, epTotal, stepPct, stepAnimated) {
     }
 }
 
+// ── Refresh por episodio ─────────────────────────────────
+// Limpia la vista en vivo al empezar cada episodio, pero
+// conserva la tabla acumulada de resultados por episodio
+// y el gráfico de renewable share por episodio.
+
+function refreshEpisode() {
+
+    // Gráficas de línea
+    [chartSoc, chartEnergy].forEach(ch => {
+        ch.data.labels = [];
+        ch.data.datasets.forEach(ds => ds.data = []);
+        ch.update("none");
+    });
+
+    // Distribución de estrategias (doughnuts)
+    solarCounts = { honest: 0, hide_information: 0, deception: 0 };
+    windCounts  = { honest: 0, hide_information: 0, deception: 0 };
+    updateDoughnut(chartSolarStrat, solarCounts);
+    updateDoughnut(chartWindStrat,  windCounts);
+
+    // Logs de estrategia y tabla de eventos
+    solarLog = []; windLog = []; logRows = [];
+    ["solar-log", "wind-log", "log-body"].forEach(id => {
+        document.getElementById(id).innerHTML = "";
+    });
+
+    // Valores en vivo de los agentes
+    ["live-solar-energy", "live-solar-price",
+     "live-wind-energy",  "live-wind-price"].forEach(id => {
+        document.getElementById(id).textContent = "—";
+    });
+    document.getElementById("live-solar-badge").textContent = "—";
+    document.getElementById("live-solar-badge").className   = "badge bg-secondary fs-6";
+    document.getElementById("live-wind-badge").textContent  = "—";
+    document.getElementById("live-wind-badge").className    = "badge bg-secondary fs-6";
+
+    // KPIs de paso (se mantiene kpi-episode)
+    ["kpi-soc", "kpi-grid", "kpi-renew",
+     "kpi-cost", "kpi-elapsed"].forEach(id => {
+        document.getElementById(id).textContent = "—";
+    });
+}
+
 // ── Arrancar stream ──────────────────────────────────────
 
 function startStream() {
@@ -705,7 +722,7 @@ function startStream() {
 
     const btn = document.getElementById("btn-run");
     btn.disabled    = true;
-    btn.textContent = "⏳ Running…";
+    btn.textContent = "Running…";
 
     es = new EventSource("/stream/" + mode + "?n_episodes=" + n_episodes);
 
@@ -723,6 +740,13 @@ function startStream() {
             currentEp = msg.episode;
             socSum    = 0;
             socCount  = 0;
+
+            // Refrescar el panel en vivo al empezar cada episodio.
+            // El episodio anterior permanece visible hasta este punto;
+            // como NO hay ningún episode_start después del último,
+            // ese último episodio se queda en pantalla al terminar.
+            refreshEpisode();
+
             document.getElementById("kpi-episode").textContent =
                 msg.episode + " / " + msg.n_episodes;
             setProgress(msg.episode - 1, msg.n_episodes, 0, true);
@@ -787,19 +811,11 @@ function startStream() {
             setProgress(currentEp, msg.n_episodes, 100, false);
             addEpisodeResult(currentEp, msg.data);
 
-            // Resetear gráficas de línea entre episodios (si hay más)
-            if (currentEp < msg.n_episodes) {
-                chartSoc.data.labels = [];
-                chartSoc.data.datasets[0].data = [];
-                chartEnergy.data.labels = [];
-                chartEnergy.data.datasets.forEach(ds => ds.data = []);
-            }
-
         // ── done (todo terminado) ──────────────────────
         } else if (msg.type === "done") {
 
             btn.disabled    = false;
-            btn.textContent = "▶ Run Again";
+            btn.textContent = "Run Again";
             es.close();
             es = null;
 
@@ -808,7 +824,7 @@ function startStream() {
 
     es.onerror = function() {
         btn.disabled    = false;
-        btn.textContent = "▶ Run Simulation";
+        btn.textContent = "Run Simulation";
         if (es) { es.close(); es = null; }
     };
 }

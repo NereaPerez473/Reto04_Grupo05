@@ -137,11 +137,11 @@ def run_evaluation_streaming(
     # ==================================================
 
     if mode == "negotiation":
-        solar_agent = NegotiationQLearning(epsilon=0.0)
-        wind_agent  = NegotiationQLearning(epsilon=0.0)
+        solar_agent = NegotiationQLearning(epsilon=0.3)
+        wind_agent  = NegotiationQLearning(epsilon=0.3)
     else:
-        solar_agent = StandardQLearning(epsilon=0.0)
-        wind_agent  = StandardQLearning(epsilon=0.0)
+        solar_agent = StandardQLearning(epsilon=0.3)
+        wind_agent  = StandardQLearning(epsilon=0.3)
 
     solar_agent.q_table = np.load(QTABLE_SOLAR)
     wind_agent.q_table  = np.load(QTABLE_WIND)
