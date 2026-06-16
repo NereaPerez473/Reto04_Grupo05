@@ -1,43 +1,17 @@
-"""
-sma_trainer.py
-==============
-Generador SSE para entrenamiento en vivo de los tres modos:
-  competitive / cooperative / negotiation
-
-Emite un evento por episodio con métricas acumuladas de aprendizaje,
-permitiendo visualizar en tiempo real cómo evolucionan los agentes.
-
-Tipos de evento emitidos:
-  - "train_init"    : metadatos iniciales (n_episodes, n_steps, mode)
-  - "train_episode" : al final de cada episodio con todas las métricas
-  - "train_done"    : al terminar, con las Q-tables finales guardadas
-"""
-
 import numpy as np
 import pandas as pd
 import time
 from pathlib import Path
 from collections import Counter
 
-
-# ==================================================
-# GENERADOR PRINCIPAL
-# ==================================================
+# Entrenamiento de agentes y emisor de eventos por episodio
 
 def run_training_streaming(
     mode: str = "competitive",
     n_episodes: int = 200,
     save_qtables: bool = True
 ):
-    """
-    Generador que entrena los agentes y emite un evento SSE por episodio.
-
-    Parámetros
-    ----------
-    mode        : "competitive" | "cooperative" | "negotiation"
-    n_episodes  : número de episodios de entrenamiento
-    save_qtables: si True guarda las Q-tables en /project/... al terminar
-    """
+    # Rutas de los datos necesarios para el training
 
     BASE_DIR = Path("/project")
 
@@ -49,7 +23,7 @@ def run_training_streaming(
     OUTPUT_DIR = BASE_DIR / "mas_qlearning_battery" / "results"
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # ── Importaciones dinámicas según el modo ──────────────────────────
+    # Importamos los agents de SMA, para cada modo los suyos
     from mas_qlearning_battery.simple_battery import SimpleBattery
     from mas_qlearning_battery.strategies import NegotiationStrategies
 
@@ -62,7 +36,7 @@ def run_training_streaming(
             StrategyQLearning
         )
 
-    # ── Carga de datos ─────────────────────────────────────────────────
+    # Cargamos los datos
     t0 = time.perf_counter()
 
     solar = pd.read_csv(SOLAR_CSV)["SystemProduction_AS"].astype(float).values
@@ -80,7 +54,7 @@ def run_training_streaming(
 
     t_load = round(time.perf_counter() - t0, 3)
 
-    # ── Agentes y batería ──────────────────────────────────────────────
+    # Agentes y batería
     solar_agent = StrategyQLearning(alpha=0.1, gamma=0.95, epsilon=1.0)
     wind_agent  = StrategyQLearning(alpha=0.1, gamma=0.95, epsilon=1.0)
 
@@ -92,7 +66,7 @@ def run_training_streaming(
 
     MARKET_BONUS_FACTOR = 0.1  # solo usado en modo negotiation
 
-    # ── Evento inicial ─────────────────────────────────────────────────
+    # Primer evento
     yield {
         "type":       "train_init",
         "mode":       mode,
@@ -101,18 +75,16 @@ def run_training_streaming(
         "t_load_s":   t_load
     }
 
-    # ── Histórico de recompensas para ventana móvil ────────────────────
+    # Guardamos los rewards para mostrar por pantalla
     reward_window = []  # últimos 20 episodios para media móvil
     WINDOW = 20
 
     train_start = time.perf_counter()
 
-    # ==================================================
-    # BUCLE DE ENTRENAMIENTO
-    # ==================================================
+    # Training Q-Learning
     for episode in range(1, n_episodes + 1):
 
-        ep_start = time.perf_counter()
+        ep_start = time.perf_counter() # Para orquestar cuanto tarda el training
         battery.reset()
 
         solar_total_reward = 0.0
@@ -130,12 +102,14 @@ def run_training_streaming(
             solar_power   = solar[t]
             wind_power    = wind[t]
 
-            # ── Batería: descarga antes de la negociación ──────────────
+            # Descarga de la batería antes de empezar
             battery_contribution = battery.discharge(demand)
-            effective_demand     = demand - battery_contribution
+
+            effective_demand = demand - battery_contribution
+
             episode_soc.append(battery.soc)
 
-            # ── Estado ────────────────────────────────────────────────
+            # Actualizamos rewards, cada estado tiene su configuración
             if mode == "negotiation":
                 solar_state = solar_agent.get_state(
                     effective_demand, current_price, solar_power, battery.soc
@@ -151,7 +125,7 @@ def run_training_streaming(
                     effective_demand, current_price, battery.soc
                 )
 
-            # ── Acciones ──────────────────────────────────────────────
+            # Actualizamos las acciones
             solar_action   = solar_agent.choose_action(solar_state)
             wind_action    = wind_agent.choose_action(wind_state)
             solar_strategy = solar_agent.action_to_strategy(solar_action)
@@ -160,12 +134,12 @@ def run_training_streaming(
             solar_counter[solar_strategy] += 1
             wind_counter[wind_strategy]   += 1
 
-            # ── Producción declarada ───────────────────────────────────
+            # Cada agente declara lo que quiere en función del modo
             FACTORS = {"honest": 1.0, "hide_information": 0.7, "deception": 1.3}
             solar_declared = solar_power * FACTORS[solar_strategy]
             wind_declared  = wind_power  * FACTORS[wind_strategy]
 
-            # ── Propuestas de precio ───────────────────────────────────
+            # Y hace una propuesta del precio
             solar_proposal = NegotiationStrategies.apply(
                 solar_strategy, solar_power, current_price
             )
@@ -173,7 +147,7 @@ def run_training_streaming(
                 wind_strategy, wind_power, current_price
             )
 
-            # ── Merit-order dispatch ───────────────────────────────────
+            # Se ordenan por precio menor
             proposals = [
                 ("solar", solar_declared, solar_proposal.price_eur_kwh),
                 ("wind",  wind_declared,  wind_proposal.price_eur_kwh)
@@ -195,12 +169,15 @@ def run_training_streaming(
                     wind_allocated = purchase
                 remaining = max(0.0, remaining - purchase)
 
-            # ── Energía entregada y excedentes ────────────────────────
+            # Se calcula la energía que se ha entregado al consumer
             solar_delivered = min(solar_allocated, solar_power)
             wind_delivered  = min(wind_allocated,  wind_power)
             renewable_delivered = solar_delivered + wind_delivered
 
-            grid_purchased = max(0.0, effective_demand - renewable_delivered)
+            grid_purchased = 0.0
+
+            if renewable_delivered < effective_demand:
+                grid_purchased = effective_demand - renewable_delivered
 
             physical_surplus = max(
                 0.0,
@@ -211,14 +188,14 @@ def run_training_streaming(
 
             episode_grid_kwh += grid_purchased
 
-            # ── Rewards ───────────────────────────────────────────────
+            # Recalculamos rewards
             solar_revenue = solar_delivered * solar_proposal.price_eur_kwh
             wind_revenue  = wind_delivered  * wind_proposal.price_eur_kwh
 
             solar_excess = max(0.0, solar_declared - solar_power)
             wind_excess  = max(0.0, wind_declared  - wind_power)
 
-            dpf = 3.0 - 2.0 * battery.soc  # dynamic penalty factor
+            dpf = 3.0 - 2.0 * battery.soc  # dynamic penalty: penaliza por mentir si está vacía
 
             if mode == "competitive":
                 solar_reward = solar_revenue - dpf * solar_excess * current_price
@@ -243,7 +220,7 @@ def run_training_streaming(
             solar_total_reward += solar_reward
             wind_total_reward  += wind_reward
 
-            # ── Next-state y actualización Q ──────────────────────────
+            # Next-state y actualización Q 
             next_d   = load[t + 1]
             next_nbc = min(next_d, battery.available_discharge_kw())
             next_eff = next_d - next_nbc
@@ -266,11 +243,11 @@ def run_training_streaming(
             solar_agent.update(solar_state, solar_action, solar_reward, next_solar_state)
             wind_agent.update(wind_state,   wind_action,  wind_reward,  next_wind_state)
 
-        # ── Epsilon decay ──────────────────────────────────────────────
-        solar_agent.epsilon = max(0.01, solar_agent.epsilon * 0.999)
-        wind_agent.epsilon  = max(0.01, wind_agent.epsilon  * 0.999)
+        # Epsilon decay 
+        solar_agent.epsilon = max(0.01, solar_agent.epsilon * 0.8)
+        wind_agent.epsilon  = max(0.01, wind_agent.epsilon  * 0.8)
 
-        # ── Métricas del episodio ──────────────────────────────────────
+        # Métricas del episodio 
         total_reward   = solar_total_reward + wind_total_reward
         avg_soc        = float(np.mean(episode_soc)) if episode_soc else 0.5
         ep_elapsed     = round(time.perf_counter() - ep_start, 3)
@@ -285,7 +262,7 @@ def run_training_streaming(
         solar_dom = max(solar_counter, key=solar_counter.get) if solar_counter else "honest"
         wind_dom  = max(wind_counter,  key=wind_counter.get)  if wind_counter  else "honest"
 
-        # ── Evento SSE ────────────────────────────────────────────────
+        # Evento
         yield {
             "type":        "train_episode",
             "episode":     episode,
@@ -326,9 +303,7 @@ def run_training_streaming(
             "total_elapsed_s": total_elapsed,
         }
 
-    # ==================================================
-    # GUARDAR Q-TABLES
-    # ==================================================
+    # Guardar Q-tables, por si quisieramos luego evaluar
     if save_qtables:
         np.save(
             OUTPUT_DIR / f"{mode}_battery_solar_qtable.npy",

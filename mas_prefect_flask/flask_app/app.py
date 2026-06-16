@@ -15,12 +15,10 @@ import os
 
 app = Flask(__name__)
 
-# Prefect UI base URL (override with env var PREFECT_UI_URL if needed)
+# URL base de Prefect
 PREFECT_UI_URL = os.environ.get("PREFECT_UI_URL", "http://localhost:4200")
 
-# ==================================================
-# REDIRECCIÓN RAÍZ → TRAINING
-# ==================================================
+# Sólo la pantalla de training
 
 @app.route("/")
 def index():
@@ -31,9 +29,7 @@ def training():
     return render_template("training.html")
 
 
-# ==================================================
-# SSE: ENTRENAMIENTO EN TIEMPO REAL
-# ==================================================
+# Entrenamiento en tiempo real
 
 @app.route("/train/<mode>")
 def stream_training(mode):
@@ -49,9 +45,7 @@ def stream_training(mode):
 
     save_qtables = request.args.get("save", "1") != "0"
 
-    # ==========================================
-    # LANZAR PREFECT EN PARALELO
-    # ==========================================
+    # Lanzamos prefect en paralelo para orquestar el entrenamiento
 
     def launch_prefect():
         from prefect_pipeline import training_flow
@@ -66,9 +60,7 @@ def stream_training(mode):
         daemon=True
     ).start()
 
-    # ==========================================
-    # SSE NORMAL
-    # ==========================================
+    # Generamos los eventos
 
     def generate():
         from sma_trainer import run_training_streaming
@@ -88,11 +80,6 @@ def stream_training(mode):
             "X-Accel-Buffering": "no"
         }
     )
-
-
-# ==================================================
-# MAIN
-# ==================================================
 
 if __name__ == "__main__":
 
