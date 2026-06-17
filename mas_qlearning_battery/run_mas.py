@@ -1,25 +1,27 @@
 """
 run_mas.py
 ==========
-Punto de entrada de la simulación MAS.
+Punto de entrada de la simulación MAS para la microred con batería compartida.
 
-Lanza los servidores de AS y AE en threads daemon, espera a que estén listos
-y ejecuta la simulación completa a través del AgenteConsumidor.
+Lanza los servidores del Agente Solar (AS) y Agente Eólico (AE) en threads daemon,
+espera a que estén listos, e instancia el AgenteConsumidor con la batería física integrada.
+Carga las Q-Tables correspondientes al modo de entrenamiento seleccionado y ejecuta
+la simulación de las tácticas de negociación.
 
 Uso básico
 ----------
-    # Todos honestos (baseline)
+    # Modo competitivo (baseline por defecto), todos honestos
     python run_mas.py
 
-    # AS engaña, AE honesto
-    python run_mas.py --strategy-as deception --strategy-ae honest
+    # Modo competitivo, AS engaña, AE honesto
+    python run_mas.py --mode competitive --strategy-as deception --strategy-ae honest
 
-    # Ambos ocultan información
-    python run_mas.py --strategy-as hide_information --strategy-ae hide_information --n-steps 200
+    # Modo cooperativo, ambos ocultan información
+    python run_mas.py --mode cooperative --strategy-as hide_information --strategy-ae hide_information --n-steps 200
 
 Salida
 ------
-    data/results/mas_results_as_{estrategia}_ae_{estrategia}_n{steps}.csv
+    mas_qlearning_battery/results/mas_battery_results_as_{estrategia}_ae_{estrategia}_n{steps}.csv
 
 Comparación de todas las estrategias
 --------------------------------------
