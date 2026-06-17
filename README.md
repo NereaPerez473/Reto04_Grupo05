@@ -48,13 +48,6 @@ RETO4/
         └── scheduler.py
 ```
 
-## Instrucciones de Ejecución
-1. Clonar el repositorio.
-2. Construir la imagen Docker: `docker build -t microred-reto4 .`
-3. Levantar el contenedor: `docker run -d microred-reto4`
-4. Iniciar el servidor local de Prefect: `prefect server start`
-5. Ejecutar el flujo principal: `python pipeline/main_flow.py`
-
 ## Ejecución
 
 El proyecto tiene **dos pipelines independientes**, cada uno con su propio `docker-compose.yml`. Deben levantarse por separado desde su carpeta correspondiente.
@@ -66,7 +59,7 @@ git clone <url-del-repositorio>
 cd RETO
 ```
 
----
+
 
 ### Pipeline 1 — Entrenamiento MAS (`mas_prefect_flask/`)
 Entrena los agentes Q-Learning y expone una interfaz Flask para lanzar y monitorizar entrenamientos.
@@ -86,7 +79,6 @@ Para detener:
 docker compose down
 ```
 
----
 
 ### Pipeline 2 — ETL + Inferencia + Optimización (`opt_prefect_flask/`)
 
@@ -114,4 +106,3 @@ Para detener:
 docker compose down
 ```
 
----
