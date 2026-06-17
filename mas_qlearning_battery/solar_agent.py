@@ -6,10 +6,6 @@ Agente Solar (AS) — servidor FIPA-ACL en el puerto 5001.
 Hereda toda la lógica de negociación de ProducerAgent.
 Solo configura nombre, puerto y columna del CSV específicos del panel fotovoltaico.
 
-CSV esperado (data/results/Predicciones_Solar.csv):
-    Date, SystemProduction_AS
-    2017-01-02T00:00:00.000000, 1.348889
-    ...
 
 Uso
 ---
