@@ -13,7 +13,7 @@ Este proyecto desarrolla un sistema multiagente (MAS) para gestionar una microre
 * **Orquestación:** Prefect
 * **Procesamiento de Datos:** Polars (procesamiento eficiente de datos meteorológicos y de carga)
 * **Optimización:** jMetalPy (algoritmos NSGA-II y SPEA2 para optimización del despacho de energía)
-* **Sistemas Multiagente:** Comunicación basada en el estándar FIPA-ACL
+* **Sistemas Multiagente:** Comunicación basada en el estándar FIPA-ACL y Q-Learning
 * **Infraestructura:** Docker (despliegue del pipeline y persistencia)
 
 ## Estructura del Proyecto
