@@ -3,8 +3,7 @@ fipa_acl.py
 ===========
 Utilidades de mensajería FIPA-ACL.
 
-Serializa y deserializa mensajes en JSON, igual que en los ejemplos de clase
-pero con soporte para content de tipo dict (además de str).
+Serializa y deserializa mensajes en JSON, con soporte para content de tipo dict (además de str).
 
 Performativas usadas en este proyecto:
   cfp              → AC invita a AS/AE a presentar propuestas
