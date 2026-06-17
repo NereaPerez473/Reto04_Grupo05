@@ -46,7 +46,7 @@ def _save_state(state: dict) -> None:
 
 def main() -> None:
     sys.path.insert(0, str(BASE_DIR))
-    from pipeline.flow import pipeline_microred  # noqa: PLC0415
+    from pipeline.flow import pipeline_microred 
 
     print(f"[Scheduler] interval={INTERVAL}s  window={WINDOW_H}h  max_data={MAX_HOURS}h")
     print(f"[Scheduler] state file: {STATE_FILE}")

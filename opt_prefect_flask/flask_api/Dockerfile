@@ -1,12 +1,5 @@
 # ============================================================
 # Imagen unica usada tanto por pipeline-worker como flask-api.
-# Los modelos (.pkl) y los datos (data/) se montan como
-# bind mounts en docker-compose.yml, NO se copian aqui.
-#
-# Este Dockerfile vive en flask_api/ pero se construye con el
-# contexto de build apuntando a la raiz de opt_prefect_flask_v2
-# (ver docker-compose.yml: context: . / dockerfile: flask_api/Dockerfile)
-# para poder copiar tambien la carpeta pipeline/.
 # ============================================================
 FROM python:3.11
 

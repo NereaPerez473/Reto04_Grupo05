@@ -17,7 +17,7 @@ def tarea_predecir_eolico(ruta_datos: str, ruta_modelo: str, ruta_salida: str) -
     modelo = joblib.load(ruta_modelo)
     
     print(f"Leyendo datos procesados desde: {ruta_datos}")
-    # Leemos el CSV (aquí podemos usar read_csv directo porque el archivo ya es pequeño/filtrado)
+    # Leemos el CSV
     df_features = pl.read_csv(ruta_datos).with_columns(pl.col("Date").str.to_datetime())
     
     # Scikit-learn necesita una matriz numérica pura, así que quitamos la columna 'Date'
