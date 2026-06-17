@@ -90,11 +90,11 @@ def run_simulation(
         soc_min=0.05
     )
 
-    # NUEVO: Construir las rutas dinámicas a las Q-Tables basadas en el modo
+    # Construir las rutas dinámicas a las Q-Tables basadas en el modo
     qtable_solar_path = os.path.join(output_dir, f"{mode}_battery_solar_qtable.npy")
     qtable_wind_path  = os.path.join(output_dir, f"{mode}_battery_wind_qtable.npy")
 
-    # NUEVO: Instanciar agentes inyectando las rutas de las Q-Tables
+    # Instanciar agentes inyectando las rutas de las Q-Tables
     solar = SolarAgent(csv_path=solar_csv, strategy_name=strategy_as, qtable_path=qtable_solar_path)
     wind  = WindAgent(csv_path=wind_csv,   strategy_name=strategy_ae, qtable_path=qtable_wind_path)
     
