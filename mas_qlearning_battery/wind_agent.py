@@ -6,11 +6,6 @@ Agente Eólico (AE) — servidor FIPA-ACL en el puerto 5002.
 Hereda toda la lógica de negociación de ProducerAgent.
 Solo configura nombre, puerto y columna del CSV específicos del aerogenerador.
 
-CSV esperado (data/results/Predicciones_Eolico.csv):
-    Date, Power_AE
-    2017-01-02T00:00:00.000000, 15.103733
-    ...
-
 Uso
 ---
     # Desde código:
